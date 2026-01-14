@@ -53,5 +53,7 @@ jobs:
       with:
         files: release/${{ matrix.ASSET_NAME }}
         tag_name: ${{ github.event.inputs.tag }}
+        draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
