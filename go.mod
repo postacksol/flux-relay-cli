@@ -1,4 +1,4 @@
-module github.com/fluxrelay/flux-relay-cli
+module github.com/postacksol/flux-relay-cli
 
 go 1.21
 
