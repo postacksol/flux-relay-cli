@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fluxrelay/flux-relay-cli/internal/api"
+	"github.com/postacksol/flux-relay-cli/internal/api"
 )
 
 type Config struct {
