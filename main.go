@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/fluxrelay/flux-relay-cli/cmd"
+	"github.com/postacksol/flux-relay-cli/cmd"
 )
 
 func main() {

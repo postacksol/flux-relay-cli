@@ -32,3 +32,8 @@ Thumbs.db
 # Config (contains tokens)
 config.json
 *.key
+
+# Build artifacts
+flux-relay
+flux-relay.exe
+*.exe
