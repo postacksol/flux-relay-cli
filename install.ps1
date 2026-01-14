@@ -40,11 +40,31 @@ try {
     }
 }
 
-# Find Windows binary
-$asset = $release.assets | Where-Object { 
-    ($_.name -like "*windows*$arch*" -or $_.name -like "*windows*.exe" -or $_.name -like "*Windows*$arch*") -and
-    $_.name -notlike "*.zip" -and $_.name -notlike "*.tar.gz"
-} | Select-Object -First 1
+# Find Windows binary - try multiple patterns
+$asset = $null
+$patterns = @(
+    "*windows*$arch*.exe",
+    "*windows*.exe",
+    "*Windows*$arch*.exe",
+    "*Windows*.exe",
+    "flux-relay-windows-$arch.exe",
+    "flux-relay-windows-amd64.exe",
+    "*.exe"
+)
+
+foreach ($pattern in $patterns) {
+    $asset = $release.assets | Where-Object { 
+        $_.name -like $pattern -and
+        $_.name -notlike "*.zip" -and 
+        $_.name -notlike "*.tar.gz" -and
+        $_.name -notlike "*source*"
+    } | Select-Object -First 1
+    
+    if ($asset) {
+        Write-Host "Found binary: $($asset.name)" -ForegroundColor Green
+        break
+    }
+}
 
 if (-not $asset) {
     Write-Host "Error: Could not find Windows binary for this architecture" -ForegroundColor Red
