@@ -6,6 +6,8 @@ A command-line interface for managing Flux Relay messaging platform.
 
 **v1.0.0** - Initial release with authentication system
 
+> **Note:** This workflow is being tested via GitHub Actions
+
 ## Installation
 
 ### Build from Source
