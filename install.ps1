@@ -15,22 +15,47 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
     $arch = "arm64"
 }
 
-# Get latest release
+# Get latest release (including pre-releases)
 Write-Host "Fetching latest release..." -ForegroundColor Yellow
 try {
+    # Try latest release first
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/postacksol/flux-relay-cli/releases/latest" -ErrorAction Stop
     $version = $release.tag_name
     Write-Host "Latest version: $version" -ForegroundColor Green
 } catch {
-    Write-Host "Error: Could not fetch latest release. Using v1.0.0" -ForegroundColor Red
-    $version = "v1.0.0"
+    # If no latest release, try getting all releases
+    try {
+        $allReleases = Invoke-RestMethod -Uri "https://api.github.com/repos/postacksol/flux-relay-cli/releases" -ErrorAction Stop
+        if ($allReleases.Count -gt 0) {
+            $release = $allReleases[0]
+            $version = $release.tag_name
+            Write-Host "Using release: $version" -ForegroundColor Yellow
+        } else {
+            throw "No releases found"
+        }
+    } catch {
+        Write-Host "Error: Could not fetch release. Please build from source or wait for binaries." -ForegroundColor Red
+        Write-Host "Build from source: git clone https://github.com/postacksol/flux-relay-cli.git && cd flux-relay-cli && go build -o flux-relay.exe ." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 # Find Windows binary
-$asset = $release.assets | Where-Object { $_.name -like "*windows*$arch*" -or $_.name -like "*windows*.exe" } | Select-Object -First 1
+$asset = $release.assets | Where-Object { 
+    ($_.name -like "*windows*$arch*" -or $_.name -like "*windows*.exe" -or $_.name -like "*Windows*$arch*") -and
+    $_.name -notlike "*.zip" -and $_.name -notlike "*.tar.gz"
+} | Select-Object -First 1
 
 if (-not $asset) {
     Write-Host "Error: Could not find Windows binary for this architecture" -ForegroundColor Red
+    Write-Host "Available assets:" -ForegroundColor Yellow
+    $release.assets | ForEach-Object { Write-Host "  - $($_.name)" -ForegroundColor Gray }
+    Write-Host "`nThe release may not have binaries yet. The GitHub Actions workflow should build them automatically." -ForegroundColor Yellow
+    Write-Host "Please check: https://github.com/postacksol/flux-relay-cli/actions" -ForegroundColor Cyan
+    Write-Host "`nAlternatively, build from source:" -ForegroundColor Yellow
+    Write-Host "  git clone https://github.com/postacksol/flux-relay-cli.git" -ForegroundColor Gray
+    Write-Host "  cd flux-relay-cli" -ForegroundColor Gray
+    Write-Host "  go build -o flux-relay.exe ." -ForegroundColor Gray
     exit 1
 }
 
