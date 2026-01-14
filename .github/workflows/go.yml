@@ -71,7 +71,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'created')
     steps:
     - uses: actions/download-artifact@v4
       with:
@@ -79,15 +79,23 @@ jobs:
         pattern: flux-relay-*
         merge-multiple: false
 
+    - name: List downloaded artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        find artifacts -type f -name "*" || echo "No artifacts found"
+        ls -Rla artifacts/ || true
+
     - name: Create Release Assets
       run: |
         mkdir -p release-assets
-        find artifacts -name "flux-relay*" -type f -exec cp {} release-assets/ \;
-        ls -lh release-assets/
+        find artifacts -type f -name "flux-relay*" -exec cp {} release-assets/ \;
+        echo "Release assets:"
+        ls -lh release-assets/ || echo "No release assets found"
 
     - name: Upload Release Assets
       uses: softprops/action-gh-release@v1
       with:
         files: release-assets/*
+        tag_name: ${{ github.event.release.tag_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
