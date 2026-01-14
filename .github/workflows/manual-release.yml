@@ -1,0 +1,57 @@
+name: Manual Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            GOOS: linux
+            GOARCH: amd64
+            EXT: ""
+            ASSET_NAME: flux-relay-linux-amd64
+          - os: windows-latest
+            GOOS: windows
+            GOARCH: amd64
+            EXT: ".exe"
+            ASSET_NAME: flux-relay-windows-amd64.exe
+          - os: macos-latest
+            GOOS: darwin
+            GOARCH: amd64
+            EXT: ""
+            ASSET_NAME: flux-relay-darwin-amd64
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.GOOS }}
+        GOARCH: ${{ matrix.GOARCH }}
+      run: |
+        go build -v -o flux-relay${{ matrix.EXT }} .
+        mkdir -p release
+        mv flux-relay${{ matrix.EXT }} release/${{ matrix.ASSET_NAME }}
+
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/${{ matrix.ASSET_NAME }}
+        tag_name: ${{ github.event.inputs.tag }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
