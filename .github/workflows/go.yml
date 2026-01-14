@@ -1,0 +1,91 @@
+name: Go CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  release:
+    types: [ created ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./... || true
+
+  build:
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            GOOS: linux
+            GOARCH: amd64
+            EXT: ""
+          - os: windows-latest
+            GOOS: windows
+            GOARCH: amd64
+            EXT: ".exe"
+          - os: macos-latest
+            GOOS: darwin
+            GOARCH: amd64
+            EXT: ""
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.GOOS }}
+        GOARCH: ${{ matrix.GOARCH }}
+      run: |
+        go build -v -o flux-relay${{ matrix.EXT }} .
+        mkdir -p release
+        mv flux-relay${{ matrix.EXT }} release/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: flux-relay-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+        path: release/flux-relay${{ matrix.EXT }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+
+    - name: Create Release Assets
+      run: |
+        mkdir -p release-assets
+        find artifacts -name "flux-relay*" -type f -exec cp {} release-assets/ \;
+        ls -lh release-assets/
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-assets/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
