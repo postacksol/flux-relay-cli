@@ -237,7 +237,7 @@ func fetchDadJoke() string {
 		return ""
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "Flux Relay CLI (https://github.com/fluxrelay/flux-relay-cli)")
+	req.Header.Set("User-Agent", "Flux Relay CLI (https://github.com/postacksol/flux-relay-cli)")
 
 	resp, err := client.Do(req)
 	if err != nil {
