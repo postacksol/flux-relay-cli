@@ -63,7 +63,7 @@ jobs:
         mv flux-relay${{ matrix.EXT }} release/
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: flux-relay-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
         path: release/flux-relay${{ matrix.EXT }}
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         path: artifacts
 
