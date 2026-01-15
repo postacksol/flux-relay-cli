@@ -124,17 +124,28 @@ if (-not $asset) {
     }
     
     Write-Host "Cloning repository..." -ForegroundColor Yellow
-    try {
-        $gitOutput = git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git $tempDir 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Git clone failed: $gitOutput"
+    # Suppress PowerShell error handling for git (it writes to stderr even on success)
+    $ErrorActionPreference = "Continue"
+    $gitOutput = git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git $tempDir 2>&1
+    $cloneExitCode = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    
+    # Check if clone actually succeeded by verifying directory and key files exist
+    if ($cloneExitCode -ne 0 -or -not (Test-Path $tempDir) -or -not (Test-Path (Join-Path $tempDir "go.mod"))) {
+        Write-Host "Error: Failed to clone repository" -ForegroundColor Red
+        if ($gitOutput) {
+            # Filter out the "Cloning into..." message which is normal stderr output
+            $errorOutput = $gitOutput | Where-Object { $_ -notlike "*Cloning into*" -and $_ -notlike "*done*" }
+            if ($errorOutput) {
+                Write-Host "Git error: $errorOutput" -ForegroundColor Gray
+            }
         }
-    } catch {
-        Write-Host "Error: Failed to clone repository: $_" -ForegroundColor Red
         Write-Host "Make sure Git is installed and you have internet connectivity." -ForegroundColor Yellow
         Write-Host "  https://git-scm.com/download/win" -ForegroundColor Cyan
         exit 1
     }
+    
+    Write-Host "Repository cloned successfully!" -ForegroundColor Green
     
     Write-Host "Building from source..." -ForegroundColor Yellow
     Push-Location $tempDir
