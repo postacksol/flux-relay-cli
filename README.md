@@ -10,19 +10,24 @@ A command-line interface for managing Flux Relay messaging platform.
 
 ## Installation
 
-### Build from Source
+### 🚀 Quick Install
 
+**Easiest method (if you have Go):**
 ```bash
-git clone https://github.com/fluxrelay/flux-relay-cli.git
-cd flux-relay-cli
-go build -o flux-relay .
+go install github.com/postacksol/flux-relay-cli@latest
 ```
 
-### Using Go Install
-
-```bash
-go install github.com/fluxrelay/flux-relay-cli@v1.0.0
+**Windows (PowerShell one-liner):**
+```powershell
+irm https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1 | iex
 ```
+
+**Linux/macOS (Bash one-liner):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.sh | bash
+```
+
+📖 **For detailed installation instructions, see [INSTALL.md](INSTALL.md)**
 
 ## Quick Start
 

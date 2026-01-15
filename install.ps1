@@ -1,7 +1,8 @@
 # Flux Relay CLI Installer for Windows
 # Usage: 
-#   Option 1: .\install.ps1
-#   Option 2: Invoke-WebRequest -Uri https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1 -OutFile install.ps1; .\install.ps1
+#   Option 1 (One-liner): irm https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1 | iex
+#   Option 2: .\install.ps1
+#   Option 3: Invoke-WebRequest -Uri https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1 -OutFile install.ps1; .\install.ps1
 
 $ErrorActionPreference = "Stop"
 
