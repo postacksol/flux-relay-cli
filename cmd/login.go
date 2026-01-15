@@ -148,7 +148,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	time.Sleep(3 * time.Second)
 
 	// Step 3: Poll for token
-	tokenResponse, err := pollForToken(client, deviceCode.DeviceCode, deviceCode.Interval)
+	tokenResponse, err := pollForToken(client, deviceCode.DeviceCode, deviceCode.Interval, deviceCode.VerificationURI)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
@@ -267,7 +267,7 @@ func fetchDadJoke() string {
 	return joke.Joke
 }
 
-func pollForToken(client *api.Client, deviceCode string, interval int) (*api.TokenResponse, error) {
+func pollForToken(client *api.Client, deviceCode string, interval int, verificationURI string) (*api.TokenResponse, error) {
 	// Start with immediate poll, then use interval
 	firstPoll := true
 	pollCount := 0
@@ -341,15 +341,37 @@ func pollForToken(client *api.Client, deviceCode string, interval int) (*api.Tok
 				fmt.Println() // New line
 				return nil, fmt.Errorf("authorization was denied")
 			}
-			// For "Invalid device code" - this might be a timing issue, retry a few times
-			if apiErr.Code() == "Invalid device code" || apiErr.Code() == "invalid_device_code" {
-				if pollCount <= 3 {
-					// Retry a few times in case of timing issues
+			// For "Invalid device code" - this might be a timing issue, retry more times
+			errorCode := apiErr.Code()
+			if errorCode == "Invalid device code" || errorCode == "invalid_device_code" {
+				if pollCount <= 10 {
+					// Retry more times in case of timing issues (device code might not be in DB yet)
 					fmt.Print(".")
 					continue
 				}
 				fmt.Println() // New line
-				return nil, fmt.Errorf("device code not found after multiple attempts. Please make sure:\n   1. You've opened the verification URL in your browser\n   2. You've logged in successfully\n   3. The device code hasn't expired (10 minutes)\n   4. Try running 'flux-relay login' again")
+				fmt.Println()
+				fmt.Println("⚠️  Device code not found after multiple attempts.")
+				fmt.Println()
+				fmt.Println("This usually means:")
+				fmt.Println("   1. You haven't opened the verification URL in your browser yet")
+				fmt.Println("   2. You haven't logged in and authorized the device")
+				fmt.Println("   3. There's a timing issue (device code not in database yet)")
+				fmt.Println()
+				fmt.Println("Please:")
+				fmt.Println("   1. Open this URL in your browser:")
+				fmt.Printf("      %s\n", verificationURI)
+				fmt.Println("   2. Log in if prompted")
+				fmt.Println("   3. Authorize the device")
+				fmt.Println("   4. Wait a moment for authorization to complete")
+				fmt.Println()
+				return nil, fmt.Errorf("device code not found. Please complete authorization in browser first")
+			}
+			// Handle api_error (which might be a 404)
+			if errorCode == "api_error" && pollCount <= 10 {
+				// Might be a 404 or other error, retry a few times
+				fmt.Print(".")
+				continue
 			}
 			// For expired device code
 			if apiErr.Code() == "Device code expired" || apiErr.Code() == "device_code_expired" {
