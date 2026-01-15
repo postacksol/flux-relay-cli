@@ -36,8 +36,80 @@ fi
 ASSET_URL=$(echo $RELEASE | grep -oP '"browser_download_url": "\K[^"]*' | grep -i "$OS" | grep -i "$ARCH" | head -1)
 
 if [ -z "$ASSET_URL" ]; then
-    echo "Error: Could not find binary for $OS/$ARCH"
-    exit 1
+    echo "Warning: Could not find binary for $OS/$ARCH"
+    echo "The release may not have binaries yet. Building from source..."
+    echo ""
+    
+    # Check if Go is installed
+    if ! command -v go &> /dev/null; then
+        echo "Error: Go is not installed. Please install Go first:"
+        echo "  https://go.dev/dl/"
+        echo ""
+        echo "Or download a pre-built binary from:"
+        echo "  https://github.com/postacksol/flux-relay-cli/releases"
+        exit 1
+    fi
+    
+    echo "Go found: $(go version)"
+    echo ""
+    
+    # Create temporary directory for building
+    TEMP_DIR=$(mktemp -d)
+    trap "rm -rf $TEMP_DIR" EXIT
+    
+    echo "Cloning repository..."
+    if ! git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git "$TEMP_DIR" 2>/dev/null; then
+        echo "Error: Failed to clone repository. Make sure Git is installed."
+        echo "  https://git-scm.com/download/"
+        exit 1
+    fi
+    
+    echo "Building from source..."
+    cd "$TEMP_DIR"
+    if ! go build -o flux-relay .; then
+        echo "Error: Build failed"
+        exit 1
+    fi
+    
+    echo "Build successful!"
+    echo ""
+    
+    # Set binary path to built file
+    BUILT_BIN="$TEMP_DIR/flux-relay"
+    
+    # Determine install location
+    INSTALL_DIR="$HOME/.flux-relay/bin"
+    BIN_PATH="$INSTALL_DIR/flux-relay"
+    
+    # Create install directory
+    mkdir -p "$INSTALL_DIR"
+    
+    # Copy built binary to install location
+    echo "Installing binary..."
+    cp "$BUILT_BIN" "$BIN_PATH"
+    chmod +x "$BIN_PATH"
+    
+    echo "Installed successfully!"
+    echo ""
+    
+    # Skip to PATH section
+    SKIP_DOWNLOAD=true
+else
+    SKIP_DOWNLOAD=false
+fi
+
+if [ "$SKIP_DOWNLOAD" != "true" ]; then
+    # Determine install location
+    INSTALL_DIR="$HOME/.flux-relay/bin"
+    BIN_PATH="$INSTALL_DIR/flux-relay"
+    
+    # Create install directory
+    mkdir -p "$INSTALL_DIR"
+    
+    # Download binary
+    echo "Downloading binary..."
+    curl -L -o "$BIN_PATH" "$ASSET_URL"
+    chmod +x "$BIN_PATH"
 fi
 
 # Determine install location
