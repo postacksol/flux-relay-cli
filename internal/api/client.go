@@ -194,3 +194,51 @@ func (c *Client) GetCurrentUser(accessToken string) (*UserInfo, error) {
 
 	return &userInfo, nil
 }
+
+type Project struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	IsActive    bool   `json:"isActive"`
+}
+
+type ProjectsResponse struct {
+	Projects []Project `json:"projects"`
+}
+
+func (c *Client) ListProjects(accessToken string) (*ProjectsResponse, error) {
+	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to list projects: %s", string(body))
+	}
+
+	var projectsResponse ProjectsResponse
+	if err := json.Unmarshal(body, &projectsResponse); err != nil {
+		return nil, err
+	}
+
+	return &projectsResponse, nil
+}

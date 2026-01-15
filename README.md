@@ -67,6 +67,14 @@ flux-relay install
    flux-relay logout
    ```
 
+### Managing Projects
+
+1. **List all projects:**
+   ```bash
+   flux-relay projects list
+   ```
+   Shows all projects in your account with details like ID, name, description, and creation date.
+
 ## Commands
 
 - `flux-relay install` - Install or update the CLI
@@ -74,6 +82,7 @@ flux-relay install
 - `flux-relay login --headless` - Headless authentication mode
 - `flux-relay logout` - Log out and remove stored token
 - `flux-relay config set token <token>` - Set access token manually
+- `flux-relay projects list` - List all projects in your account
 
 ## Configuration
 
@@ -87,6 +96,7 @@ flux-relay install
 - ✅ Headless mode for WSL/SSH environments
 - ✅ Token validation and secure storage
 - ✅ Already logged in detection
+- ✅ Project management (list projects)
 - ✅ Dad jokes while waiting (optional entertainment)
 
 ## Requirements
