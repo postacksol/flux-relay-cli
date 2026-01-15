@@ -4,9 +4,17 @@
 
 ### Method 1: Go Install (Easiest - If you have Go)
 
+**First install:**
 ```bash
 go install github.com/postacksol/flux-relay-cli@latest
 ```
+
+**Update later:**
+```bash
+flux-relay install
+```
+
+> **Note:** Go requires the full module path (`github.com/postacksol/flux-relay-cli@latest`) for `go install`. After the first install, you can use the simpler `flux-relay install` command for updates.
 
 **Note:** Make sure `$GOPATH/bin` or `$HOME/go/bin` is in your PATH.
 

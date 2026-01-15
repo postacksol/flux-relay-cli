@@ -1,0 +1,89 @@
+# Flux Relay CLI v1.0.0
+
+## 🎉 Initial Release
+
+This is the first release of Flux Relay CLI - a command-line interface for managing your Flux Relay messaging platform.
+
+## ✨ Features
+
+- ✅ OAuth 2.0 Device Authorization Grant authentication flow
+- ✅ Automatic browser opening for authentication
+- ✅ Headless mode for WSL/SSH environments (`--headless` flag)
+- ✅ Token validation and secure storage
+- ✅ Already logged in detection
+- ✅ Manual token configuration (`config set token`)
+- ✅ Dad jokes while waiting (optional entertainment)
+
+## 🚀 Installation
+
+### Quick Install (Windows)
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1 -OutFile install.ps1
+.\install.ps1
+```
+
+### Quick Install (Linux/macOS)
+```bash
+curl -fsSL https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.sh | bash
+```
+
+### Go Install
+```bash
+go install github.com/postacksol/flux-relay-cli@v1.0.0
+```
+
+### Build from Source
+```bash
+git clone https://github.com/postacksol/flux-relay-cli.git
+cd flux-relay-cli
+go build -o flux-relay.exe .
+```
+
+## 📖 Quick Start
+
+1. **Login:**
+   ```bash
+   flux-relay login
+   ```
+
+2. **Headless Login (for WSL/SSH):**
+   ```bash
+   flux-relay login --headless
+   # Visit the URL shown, then run:
+   flux-relay config set token "YOUR_TOKEN"
+   ```
+
+3. **Check Status:**
+   ```bash
+   flux-relay login  # Shows current user if already logged in
+   ```
+
+4. **Logout:**
+   ```bash
+   flux-relay logout
+   ```
+
+## 📋 Commands
+
+- `flux-relay login` - Authenticate with Flux Relay
+- `flux-relay login --headless` - Headless authentication mode
+- `flux-relay logout` - Log out and remove stored token
+- `flux-relay config set token <token>` - Set access token manually
+
+## 🔧 Requirements
+
+- Go 1.21+ (for building from source)
+- Access to Flux Relay API server (default: http://localhost:3000)
+
+## 📝 Configuration
+
+Tokens are stored in `~/.flux-relay/config.json` with secure permissions.
+
+## 🔗 Links
+
+- Repository: https://github.com/postacksol/flux-relay-cli
+- Issues: https://github.com/postacksol/flux-relay-cli/issues
+
+---
+
+**Note:** Binaries are automatically built and attached by GitHub Actions for Linux, Windows, and macOS.

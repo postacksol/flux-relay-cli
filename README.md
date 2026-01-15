@@ -12,10 +12,13 @@ A command-line interface for managing Flux Relay messaging platform.
 
 ### 🚀 Quick Install
 
-**Easiest method (if you have Go):**
+**First time install:**
+
+**If you have Go:**
 ```bash
 go install github.com/postacksol/flux-relay-cli@latest
 ```
+> **Note:** Go requires the full module path. After first install, you can use `flux-relay install` for updates.
 
 **Windows (PowerShell one-liner):**
 ```powershell
@@ -25,6 +28,11 @@ irm https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.ps1
 **Linux/macOS (Bash one-liner):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/install.sh | bash
+```
+
+**Update existing installation:**
+```bash
+flux-relay install
 ```
 
 📖 **For detailed installation instructions, see [INSTALL.md](INSTALL.md)**
@@ -61,6 +69,7 @@ curl -fsSL https://raw.githubusercontent.com/postacksol/flux-relay-cli/main/inst
 
 ## Commands
 
+- `flux-relay install` - Install or update the CLI
 - `flux-relay login` - Authenticate with Flux Relay
 - `flux-relay login --headless` - Headless authentication mode
 - `flux-relay logout` - Log out and remove stored token
