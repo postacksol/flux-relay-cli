@@ -110,19 +110,14 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
     echo "Downloading binary..."
     curl -L -o "$BIN_PATH" "$ASSET_URL"
     chmod +x "$BIN_PATH"
+else
+    # If we built from source, INSTALL_DIR and BIN_PATH are already set above
+    # Just make sure they're set
+    if [ -z "$INSTALL_DIR" ]; then
+        INSTALL_DIR="$HOME/.flux-relay/bin"
+        BIN_PATH="$INSTALL_DIR/flux-relay"
+    fi
 fi
-
-# Determine install location
-INSTALL_DIR="$HOME/.flux-relay/bin"
-BIN_PATH="$INSTALL_DIR/flux-relay"
-
-# Create install directory
-mkdir -p "$INSTALL_DIR"
-
-# Download binary
-echo "Downloading binary..."
-curl -L -o "$BIN_PATH" "$ASSET_URL"
-chmod +x "$BIN_PATH"
 
 # Add to PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then

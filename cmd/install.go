@@ -88,16 +88,46 @@ func installViaGo() error {
 		binPath += ".exe"
 	}
 
+	binDir := filepath.Join(goPath, "bin")
 	if _, err := os.Stat(binPath); err == nil {
 		fmt.Printf("Binary installed to: %s\n", binPath)
 		fmt.Println()
-		fmt.Println("Make sure this directory is in your PATH:")
-		fmt.Printf("  %s\n", filepath.Join(goPath, "bin"))
+		
+		// Check if bin directory is in PATH
+		pathEnv := os.Getenv("PATH")
+		if pathEnv != "" {
+			pathList := filepath.SplitList(pathEnv)
+			inPath := false
+			for _, p := range pathList {
+				if p == binDir {
+					inPath = true
+					break
+				}
+			}
+			
+			if !inPath {
+				fmt.Println("⚠️  Warning: The Go bin directory is not in your PATH")
+				fmt.Println()
+				fmt.Printf("Add this to your ~/.bashrc or ~/.zshrc:\n")
+				fmt.Printf("  export PATH=\"$PATH:%s\"\n", binDir)
+				fmt.Println()
+				fmt.Println("Then run:")
+				fmt.Printf("  source ~/.bashrc  # or ~/.zshrc\n")
+				fmt.Println()
+				fmt.Println("Or add it temporarily for this session:")
+				fmt.Printf("  export PATH=\"$PATH:%s\"\n", binDir)
+			} else {
+				fmt.Println("✅ Go bin directory is already in your PATH")
+			}
+		}
+		
 		fmt.Println()
 		fmt.Println("To verify, run: flux-relay --version")
 	} else {
 		fmt.Println("Installation completed, but binary location could not be determined.")
-		fmt.Println("Make sure $GOPATH/bin or $HOME/go/bin is in your PATH.")
+		fmt.Println()
+		fmt.Println("Make sure $GOPATH/bin or $HOME/go/bin is in your PATH:")
+		fmt.Printf("  export PATH=\"$PATH:%s\"\n", binDir)
 	}
 
 	return nil
