@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	DeveloperID  string    `json:"developer_id"`
-	Email        string    `json:"email"`
-	APIURL       string    `json:"api_url,omitempty"`
+	AccessToken     string    `json:"access_token"`
+	RefreshToken    string    `json:"refresh_token"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	DeveloperID     string    `json:"developer_id"`
+	Email           string    `json:"email"`
+	APIURL          string    `json:"api_url,omitempty"`
+	SelectedProject string    `json:"selected_project,omitempty"`
 }
 
 type ConfigManager struct {
@@ -99,4 +100,31 @@ func (cm *ConfigManager) GetAccessToken() string {
 		return ""
 	}
 	return config.AccessToken
+}
+
+func (cm *ConfigManager) GetSelectedProject() string {
+	config, err := cm.GetToken()
+	if err != nil || config == nil {
+		return ""
+	}
+	return config.SelectedProject
+}
+
+func (cm *ConfigManager) SetSelectedProject(projectID string) error {
+	config, err := cm.GetToken()
+	if err != nil {
+		return fmt.Errorf("not logged in: %w", err)
+	}
+	if config == nil {
+		return fmt.Errorf("not logged in. Run 'flux-relay login' first")
+	}
+
+	config.SelectedProject = projectID
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cm.configPath, data, 0600)
 }

@@ -242,3 +242,102 @@ func (c *Client) ListProjects(accessToken string) (*ProjectsResponse, error) {
 
 	return &projectsResponse, nil
 }
+
+type Server struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	IsActive    bool   `json:"isActive"`
+	HasApiKey   bool   `json:"hasApiKey"`
+	DatabaseURL string `json:"databaseUrl,omitempty"`
+}
+
+type ServersResponse struct {
+	Servers []Server `json:"servers"`
+}
+
+func (c *Client) ListServers(accessToken string, projectID string) (*ServersResponse, error) {
+	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+projectID+"/servers", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to list servers: %s", string(body))
+	}
+
+	var serversResponse ServersResponse
+	if err := json.Unmarshal(body, &serversResponse); err != nil {
+		return nil, err
+	}
+
+	return &serversResponse, nil
+}
+
+type Database struct {
+	ID           string `json:"id"`
+	DatabaseName string `json:"databaseName"`
+	DatabaseURL  string `json:"databaseUrl,omitempty"`
+	HasToken     bool   `json:"hasToken"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt,omitempty"`
+	IsActive     bool   `json:"isActive"`
+}
+
+type DatabasesResponse struct {
+	Databases []Database `json:"databases"`
+}
+
+func (c *Client) ListDatabases(accessToken string, projectID string, serverID string) (*DatabasesResponse, error) {
+	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+projectID+"/servers/"+serverID+"/databases", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to list databases: %s", string(body))
+	}
+
+	var databasesResponse DatabasesResponse
+	if err := json.Unmarshal(body, &databasesResponse); err != nil {
+		return nil, err
+	}
+
+	return &databasesResponse, nil
+}

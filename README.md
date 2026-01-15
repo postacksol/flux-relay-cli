@@ -75,6 +75,19 @@ flux-relay install
    ```
    Shows all projects in your account with details like ID, name, description, and creation date.
 
+2. **Select a project:**
+   ```bash
+   flux-relay pr MyProject        # Select by name
+   flux-relay pr 56OSXXQH        # Select by ID
+   flux-relay pr                  # Show current project
+   ```
+
+3. **List servers in selected project:**
+   ```bash
+   flux-relay server list
+   ```
+   Shows all servers in the selected project with nameserver counts.
+
 ## Commands
 
 - `flux-relay install` - Install or update the CLI
@@ -83,6 +96,9 @@ flux-relay install
 - `flux-relay logout` - Log out and remove stored token
 - `flux-relay config set token <token>` - Set access token manually
 - `flux-relay projects list` - List all projects in your account
+- `flux-relay pr <project-name-or-id>` - Select a project to work with
+- `flux-relay pr` - Show currently selected project
+- `flux-relay server list` - List all servers in the selected project (with nameserver counts)
 
 ## Configuration
 
