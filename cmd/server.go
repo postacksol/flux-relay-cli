@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -14,9 +15,17 @@ import (
 )
 
 var serverCmd = &cobra.Command{
-	Use:   "server",
+	Use:   "server [server-name-or-id]",
 	Short: "Manage servers",
-	Long:  "List and manage servers in the selected project",
+	Long: `List and select servers in the selected project.
+
+Examples:
+  flux-relay server list              # List all servers
+  flux-relay server MyServer          # Select by name
+  flux-relay server server_123        # Select by ID
+  flux-relay server                   # Show current server`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runServerShowOrSelect,
 }
 
 var serverListCmd = &cobra.Command{
@@ -29,6 +38,11 @@ var serverListCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(serverListCmd)
 	rootCmd.AddCommand(serverCmd)
+	
+	// Add 'srv' as an alias for 'server'
+	srvCmd := *serverCmd
+	srvCmd.Use = "srv [server-name-or-id]"
+	rootCmd.AddCommand(&srvCmd)
 }
 
 func runServerList(cmd *cobra.Command, args []string) error {
@@ -180,6 +194,130 @@ func runServerList(cmd *cobra.Command, args []string) error {
 	if hasErrors {
 		fmt.Println()
 	}
+
+	return nil
+}
+
+func runServerShowOrSelect(cmd *cobra.Command, args []string) error {
+	// Get API URL
+	apiURL := apiBaseURL
+	if apiURL == "" {
+		apiURL = viper.GetString("api_url")
+		if apiURL == "" {
+			apiURL = "http://localhost:3000"
+		}
+	}
+
+	// Get access token
+	cfg := config.New()
+	accessToken := cfg.GetAccessToken()
+	if accessToken == "" {
+		return fmt.Errorf("not logged in. Run 'flux-relay login' first")
+	}
+
+	// Get selected project
+	projectID := cfg.GetSelectedProject()
+	if projectID == "" {
+		return fmt.Errorf("no project selected. Use 'flux-relay pr <project-name-or-id>' to select a project")
+	}
+
+	// If no argument, show current server
+	if len(args) == 0 {
+		selectedServerID := cfg.GetSelectedServer()
+		if selectedServerID == "" {
+			fmt.Println("No server selected.")
+			fmt.Println()
+			fmt.Println("Select a server using:")
+			fmt.Println("  flux-relay server <server-name-or-id>")
+			fmt.Println("  flux-relay srv <server-name-or-id>")
+			fmt.Println()
+			fmt.Println("Or list available servers:")
+			fmt.Println("  flux-relay server list")
+			return nil
+		}
+
+		// Get server details
+		client := api.NewClient(apiURL)
+		serversResponse, err := client.ListServers(accessToken, projectID)
+		if err != nil {
+			return fmt.Errorf("failed to get server info: %w", err)
+		}
+
+		// Find the selected server
+		var selectedServer *api.Server
+		for i := range serversResponse.Servers {
+			if serversResponse.Servers[i].ID == selectedServerID {
+				selectedServer = &serversResponse.Servers[i]
+				break
+			}
+		}
+
+		if selectedServer == nil {
+			fmt.Printf("⚠️  Selected server (ID: %s) not found.\n", selectedServerID)
+			fmt.Println("Please select a different server.")
+			return nil
+		}
+
+		fmt.Printf("Current server: %s (%s)\n", selectedServer.Name, selectedServer.ID)
+		if selectedServer.Description != "" {
+			fmt.Printf("Description: %s\n", selectedServer.Description)
+		}
+		
+		// Show selected nameserver if any
+		selectedNameserverID := cfg.GetSelectedNameserver()
+		if selectedNameserverID != "" {
+			databasesResponse, err := client.ListDatabases(accessToken, projectID, selectedServerID)
+			if err == nil {
+				for _, db := range databasesResponse.Databases {
+					if db.ID == selectedNameserverID {
+						fmt.Printf("Nameserver: %s (%s)\n", db.DatabaseName, db.ID)
+						break
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	// If argument provided, treat as server selection
+	serverIdentifier := strings.Join(args, " ")
+
+	// Get all servers
+	client := api.NewClient(apiURL)
+	serversResponse, err := client.ListServers(accessToken, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	// Find server by ID or name (case-insensitive)
+	var selectedServer *api.Server
+	for i := range serversResponse.Servers {
+		server := &serversResponse.Servers[i]
+		if server.ID == serverIdentifier || 
+		   strings.EqualFold(server.Name, serverIdentifier) {
+			selectedServer = server
+			break
+		}
+	}
+
+	if selectedServer == nil {
+		return fmt.Errorf("server '%s' not found. Use 'flux-relay server list' to see available servers", serverIdentifier)
+	}
+
+	// Save selected server
+	if err := cfg.SetSelectedServer(selectedServer.ID); err != nil {
+		return fmt.Errorf("failed to save server selection: %w", err)
+	}
+
+	fmt.Printf("✅ Selected server: %s (%s)\n", selectedServer.Name, selectedServer.ID)
+	if selectedServer.Description != "" {
+		fmt.Printf("   Description: %s\n", selectedServer.Description)
+	}
+	fmt.Println()
+	fmt.Println("You can now use:")
+	fmt.Println("  flux-relay ns list              # List nameservers")
+	fmt.Println("  flux-relay ns <nameserver-name> # Select nameserver")
+	fmt.Println("  flux-relay sql <query>          # Execute SQL query")
 
 	return nil
 }

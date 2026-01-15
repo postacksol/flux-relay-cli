@@ -100,7 +100,8 @@ func runPrShowOrSelect(cmd *cobra.Command, args []string) error {
 	}
 
 	// If argument provided, treat as project selection
-	projectIdentifier := args[0]
+	// Join all args to handle names with spaces (e.g., "My Project Name")
+	projectIdentifier := strings.Join(args, " ")
 
 	// Get all projects
 	client := api.NewClient(apiURL)

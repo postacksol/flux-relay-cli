@@ -85,8 +85,36 @@ flux-relay install
 3. **List servers in selected project:**
    ```bash
    flux-relay server list
+   # or
+   flux-relay srv list
    ```
    Shows all servers in the selected project with nameserver counts.
+
+4. **Select a server:**
+   ```bash
+   flux-relay server MyServer        # Select by name
+   flux-relay srv server_123        # Select by ID (using alias)
+   flux-relay server                 # Show current server
+   ```
+
+5. **List nameservers in selected server:**
+   ```bash
+   flux-relay ns list
+   ```
+   Shows all nameservers (databases) in the selected server.
+
+6. **Select a nameserver:**
+   ```bash
+   flux-relay ns db                  # Select by name
+   flux-relay ns db_123              # Select by ID
+   flux-relay ns                     # Show current nameserver
+   ```
+
+7. **Execute SQL queries:**
+   ```bash
+   flux-relay sql "SELECT * FROM conversations_db WHERE server_id = ? LIMIT 10"
+   ```
+   Executes SQL queries on the selected server. Queries automatically filter by server_id.
 
 ## Commands
 
@@ -96,9 +124,15 @@ flux-relay install
 - `flux-relay logout` - Log out and remove stored token
 - `flux-relay config set token <token>` - Set access token manually
 - `flux-relay pr list` - List all projects in your account
-- `flux-relay pr <project-name-or-id>` - Select a project to work with
+- `flux-relay pr <project-name-or-id>` - Select a project to work with (supports names with spaces)
 - `flux-relay pr` - Show currently selected project
-- `flux-relay server list` - List all servers in the selected project (with nameserver counts)
+- `flux-relay server list` or `flux-relay srv list` - List all servers in the selected project (with nameserver counts)
+- `flux-relay server <server-name-or-id>` or `flux-relay srv <server-name-or-id>` - Select a server
+- `flux-relay server` or `flux-relay srv` - Show currently selected server
+- `flux-relay ns list` - List all nameservers in the selected server
+- `flux-relay ns <nameserver-name-or-id>` - Select a nameserver
+- `flux-relay ns` - Show currently selected nameserver
+- `flux-relay sql <query>` - Execute SQL query on the selected server/nameserver
 
 ## Configuration
 

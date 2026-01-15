@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -340,4 +341,66 @@ func (c *Client) ListDatabases(accessToken string, projectID string, serverID st
 	}
 
 	return &databasesResponse, nil
+}
+
+type QueryRequest struct {
+	Query string        `json:"query"`
+	Args  []interface{} `json:"args,omitempty"`
+}
+
+type QueryResponse struct {
+	Columns      []string        `json:"columns"`
+	Rows         [][]interface{} `json:"rows"`
+	RowsAffected int             `json:"rowsAffected"`
+	ExecutionTime int            `json:"executionTime"`
+	Success      bool            `json:"success"`
+	ErrorMessage string          `json:"errorMessage,omitempty"`
+}
+
+func (c *Client) ExecuteQuery(accessToken string, projectID string, serverID string, query string, args []interface{}) (*QueryResponse, error) {
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/database/query", c.BaseURL, projectID, serverID)
+	
+	reqBody := QueryRequest{
+		Query: query,
+		Args:  args,
+	}
+	
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to execute query: %s", string(body))
+	}
+
+	var queryResponse QueryResponse
+	if err := json.Unmarshal(body, &queryResponse); err != nil {
+		return nil, err
+	}
+
+	return &queryResponse, nil
 }

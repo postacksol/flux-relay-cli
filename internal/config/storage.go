@@ -11,13 +11,15 @@ import (
 )
 
 type Config struct {
-	AccessToken     string    `json:"access_token"`
-	RefreshToken    string    `json:"refresh_token"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	DeveloperID     string    `json:"developer_id"`
-	Email           string    `json:"email"`
-	APIURL          string    `json:"api_url,omitempty"`
-	SelectedProject string    `json:"selected_project,omitempty"`
+	AccessToken       string    `json:"access_token"`
+	RefreshToken      string    `json:"refresh_token"`
+	ExpiresAt         time.Time `json:"expires_at"`
+	DeveloperID       string    `json:"developer_id"`
+	Email             string    `json:"email"`
+	APIURL            string    `json:"api_url,omitempty"`
+	SelectedProject   string    `json:"selected_project,omitempty"`
+	SelectedServer    string    `json:"selected_server,omitempty"`
+	SelectedNameserver string    `json:"selected_nameserver,omitempty"`
 }
 
 type ConfigManager struct {
@@ -120,6 +122,65 @@ func (cm *ConfigManager) SetSelectedProject(projectID string) error {
 	}
 
 	config.SelectedProject = projectID
+	// Clear server and nameserver when changing project
+	config.SelectedServer = ""
+	config.SelectedNameserver = ""
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cm.configPath, data, 0600)
+}
+
+func (cm *ConfigManager) GetSelectedServer() string {
+	config, err := cm.GetToken()
+	if err != nil || config == nil {
+		return ""
+	}
+	return config.SelectedServer
+}
+
+func (cm *ConfigManager) SetSelectedServer(serverID string) error {
+	config, err := cm.GetToken()
+	if err != nil {
+		return fmt.Errorf("not logged in: %w", err)
+	}
+	if config == nil {
+		return fmt.Errorf("not logged in. Run 'flux-relay login' first")
+	}
+
+	config.SelectedServer = serverID
+	// Clear nameserver when changing server
+	config.SelectedNameserver = ""
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cm.configPath, data, 0600)
+}
+
+func (cm *ConfigManager) GetSelectedNameserver() string {
+	config, err := cm.GetToken()
+	if err != nil || config == nil {
+		return ""
+	}
+	return config.SelectedNameserver
+}
+
+func (cm *ConfigManager) SetSelectedNameserver(nameserverID string) error {
+	config, err := cm.GetToken()
+	if err != nil {
+		return fmt.Errorf("not logged in: %w", err)
+	}
+	if config == nil {
+		return fmt.Errorf("not logged in. Run 'flux-relay login' first")
+	}
+
+	config.SelectedNameserver = nameserverID
 
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
