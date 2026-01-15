@@ -35,8 +35,23 @@ var serverListCmd = &cobra.Command{
 	RunE:  runServerList,
 }
 
+var serverShellCmd = &cobra.Command{
+	Use:   "shell [server-name-or-id]",
+	Short: "Open interactive SQL shell for a server",
+	Long: `Open an interactive SQL shell for a server, similar to Turso's shell.
+
+Examples:
+  flux-relay server shell MyServer
+  flux-relay srv shell server_123`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runServerShell(args[0])
+	},
+}
+
 func init() {
 	serverCmd.AddCommand(serverListCmd)
+	serverCmd.AddCommand(serverShellCmd)
 	rootCmd.AddCommand(serverCmd)
 	
 	// Add 'srv' as an alias for 'server'

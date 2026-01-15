@@ -34,8 +34,23 @@ var nsListCmd = &cobra.Command{
 	RunE:  runNsList,
 }
 
+var nsShellCmd = &cobra.Command{
+	Use:   "shell [nameserver-name-or-id]",
+	Short: "Open interactive SQL shell for a nameserver",
+	Long: `Open an interactive SQL shell for a nameserver, similar to Turso's shell.
+
+Examples:
+  flux-relay ns shell db
+  flux-relay ns shell db_123`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runNameserverShell(args[0])
+	},
+}
+
 func init() {
 	nsCmd.AddCommand(nsListCmd)
+	nsCmd.AddCommand(nsShellCmd)
 	rootCmd.AddCommand(nsCmd)
 }
 

@@ -97,24 +97,81 @@ flux-relay install
    flux-relay server                 # Show current server
    ```
 
-5. **List nameservers in selected server:**
+5. **Open server shell (interactive SQL):**
+   ```bash
+   flux-relay server shell MyServer
+   # or
+   flux-relay srv shell server_123
+   ```
+   Opens an interactive SQL shell for the server (similar to Turso's shell).
+
+6. **List nameservers in selected server:**
    ```bash
    flux-relay ns list
    ```
    Shows all nameservers (databases) in the selected server.
 
-6. **Select a nameserver:**
+7. **Select a nameserver:**
    ```bash
    flux-relay ns db                  # Select by name
    flux-relay ns db_123              # Select by ID
    flux-relay ns                     # Show current nameserver
    ```
 
-7. **Execute SQL queries:**
+8. **Open nameserver shell (interactive SQL):**
+   ```bash
+   flux-relay ns shell db
+   ```
+   Opens an interactive SQL shell for the nameserver.
+
+9. **Execute SQL queries (one-off):**
    ```bash
    flux-relay sql "SELECT * FROM conversations_db WHERE server_id = ? LIMIT 10"
    ```
-   Executes SQL queries on the selected server. Queries automatically filter by server_id.
+   Executes a single SQL query on the selected server. Queries automatically filter by server_id.
+
+### Interactive SQL Shell
+
+The interactive shell works like Turso's shell, allowing you to run multiple SQL queries in a session:
+
+**Server Shell:**
+```bash
+flux-relay server shell MyServer
+# or
+flux-relay srv shell MyServer
+```
+
+**Nameserver Shell:**
+```bash
+flux-relay ns shell db
+```
+
+**Shell Commands:**
+- `.help` or `.h` - Show help message
+- `.quit` or `.exit` or `.q` - Exit the shell
+- `.clear` or `.c` - Clear the current query
+- `.tables` - List all tables
+- `.schema <table>` - Show schema for a table
+
+**Example Shell Session:**
+```
+→ SELECT * FROM conversations_db WHERE server_id = ? LIMIT 5;
+id    server_id    created_at
+──    ─────────    ───────────
+1     abc123       2024-01-01
+2     abc123       2024-01-02
+Rows returned: 2 (15ms)
+
+→ .tables
+name
+──
+conversations_db
+end_users_db
+messages_db
+
+→ .quit
+Goodbye!
+```
 
 ## Commands
 
@@ -129,10 +186,12 @@ flux-relay install
 - `flux-relay server list` or `flux-relay srv list` - List all servers in the selected project (with nameserver counts)
 - `flux-relay server <server-name-or-id>` or `flux-relay srv <server-name-or-id>` - Select a server
 - `flux-relay server` or `flux-relay srv` - Show currently selected server
+- `flux-relay server shell <server-name-or-id>` or `flux-relay srv shell <server-name-or-id>` - Open interactive SQL shell for a server
 - `flux-relay ns list` - List all nameservers in the selected server
 - `flux-relay ns <nameserver-name-or-id>` - Select a nameserver
 - `flux-relay ns` - Show currently selected nameserver
-- `flux-relay sql <query>` - Execute SQL query on the selected server/nameserver
+- `flux-relay ns shell <nameserver-name-or-id>` - Open interactive SQL shell for a nameserver
+- `flux-relay sql <query>` - Execute a single SQL query on the selected server/nameserver
 
 ## Configuration
 
@@ -147,6 +206,8 @@ flux-relay install
 - ✅ Token validation and secure storage
 - ✅ Already logged in detection
 - ✅ Project management (list projects)
+- ✅ Interactive SQL shell (similar to Turso)
+- ✅ Context-aware commands (project → server → nameserver)
 - ✅ Dad jokes while waiting (optional entertainment)
 
 ## Requirements
