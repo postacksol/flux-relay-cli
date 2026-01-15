@@ -97,8 +97,9 @@ if (-not $asset) {
         exit 1
     }
     
-    # Create temporary directory for building
-    $tempDir = Join-Path $env:TEMP "flux-relay-cli-install"
+    # Create temporary directory for building (with timestamp to avoid cache issues)
+    $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+    $tempDir = Join-Path $env:TEMP "flux-relay-cli-install-$timestamp"
     if (Test-Path $tempDir) {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
