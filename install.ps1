@@ -103,14 +103,35 @@ if (-not $asset) {
     }
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     
+    # Check if Git is installed
+    $gitInstalled = $false
+    try {
+        $gitVersion = git --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $gitInstalled = $true
+            Write-Host "Git found: $gitVersion" -ForegroundColor Green
+        }
+    } catch {
+        $gitInstalled = $false
+    }
+    
+    if (-not $gitInstalled) {
+        Write-Host "`nError: Git is not installed or not in PATH. Please install Git first:" -ForegroundColor Red
+        Write-Host "  https://git-scm.com/download/win" -ForegroundColor Cyan
+        Write-Host "`nOr download a pre-built binary from:" -ForegroundColor Yellow
+        Write-Host "  https://github.com/postacksol/flux-relay-cli/releases" -ForegroundColor Cyan
+        exit 1
+    }
+    
     Write-Host "Cloning repository..." -ForegroundColor Yellow
     try {
         $gitOutput = git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git $tempDir 2>&1
         if ($LASTEXITCODE -ne 0) {
-            throw "Git clone failed"
+            throw "Git clone failed: $gitOutput"
         }
     } catch {
-        Write-Host "Error: Failed to clone repository. Make sure Git is installed." -ForegroundColor Red
+        Write-Host "Error: Failed to clone repository: $_" -ForegroundColor Red
+        Write-Host "Make sure Git is installed and you have internet connectivity." -ForegroundColor Yellow
         Write-Host "  https://git-scm.com/download/win" -ForegroundColor Cyan
         exit 1
     }
