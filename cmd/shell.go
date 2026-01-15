@@ -151,6 +151,14 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 	fmt.Println()
 	fmt.Println("Type \".quit\" to exit the shell and \".help\" to list all available commands.")
 	fmt.Println()
+	fmt.Println("Enter SQL queries directly (no 'sql' prefix needed).")
+	fmt.Println("End queries with semicolon (;) or press Enter twice to execute.")
+	if nameserverName != "" {
+		fmt.Println()
+		fmt.Printf("Note: Tables use nameserver suffix. Example: conversations_%s\n", nameserverName)
+		fmt.Println("Use .tables to see all available tables.")
+	}
+	fmt.Println()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	var currentQuery strings.Builder
@@ -182,6 +190,13 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 			continue
 		}
 
+		// Detect and strip "sql" prefix if user accidentally includes it
+		lineLower := strings.ToLower(line)
+		if strings.HasPrefix(lineLower, "sql ") {
+			line = strings.TrimSpace(line[4:]) // Remove "sql " prefix
+			fmt.Println("Note: You don't need 'sql' prefix in the shell. Just type the query directly.")
+		}
+
 		// Handle special commands (start with .)
 		if strings.HasPrefix(line, ".") {
 			cmd := strings.ToLower(strings.TrimSpace(line))
@@ -195,8 +210,25 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				currentQuery.Reset()
 				fmt.Println("Query cleared.")
 			case cmd == ".tables":
+				// List all tables, including nameserver-specific ones
 				executeQuery(client, accessToken, projectID, serverID, 
 					"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+			case cmd == ".nameservers" || cmd == ".ns":
+				// List available nameservers for context
+				databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
+				if err == nil {
+					fmt.Println("Available nameservers:")
+					for _, db := range databasesResponse.Databases {
+						if db.IsActive {
+							fmt.Printf("  - %s (ID: %s)\n", db.DatabaseName, db.ID)
+						}
+					}
+					fmt.Println()
+					fmt.Println("Note: Tables are named like: conversations_{nameserver_name}")
+					fmt.Println("Example: If nameserver is 'name1', use 'conversations_name1'")
+				} else {
+					fmt.Printf("Error listing nameservers: %v\n", err)
+				}
 			case strings.HasPrefix(cmd, ".schema"):
 				parts := strings.Fields(cmd)
 				if len(parts) > 1 {
@@ -221,11 +253,21 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 		currentQuery.WriteString(line)
 
 		// Check if line ends with semicolon (end of query)
-		if strings.HasSuffix(strings.TrimRight(line, " \t"), ";") {
+		// Also handle queries that are wrapped in quotes (remove quotes)
+		trimmedLine := strings.TrimRight(line, " \t")
+		if strings.HasSuffix(trimmedLine, ";") {
 			query := strings.TrimSpace(currentQuery.String())
 			// Remove trailing semicolon
 			query = strings.TrimSuffix(query, ";")
 			query = strings.TrimSpace(query)
+			
+			// Remove surrounding quotes if present
+			if len(query) >= 2 {
+				if (query[0] == '"' && query[len(query)-1] == '"') ||
+				   (query[0] == '\'' && query[len(query)-1] == '\'') {
+					query = query[1 : len(query)-1]
+				}
+			}
 			
 			if query != "" {
 				executeQuery(client, accessToken, projectID, serverID, query)
@@ -321,8 +363,14 @@ func printHelp() {
 	fmt.Println("  .clear, .c        Clear the current query")
 	fmt.Println("  .tables           List all tables")
 	fmt.Println("  .schema <table>   Show schema for a table")
+	fmt.Println("  .nameservers, .ns List available nameservers")
 	fmt.Println()
 	fmt.Println("SQL queries:")
 	fmt.Println("  Enter SQL queries directly. End with semicolon (;) or empty line to execute.")
 	fmt.Println("  Multi-line queries are supported.")
+	fmt.Println()
+	fmt.Println("Table naming:")
+	fmt.Println("  Tables are named with nameserver suffix: conversations_{nameserver_name}")
+	fmt.Println("  Example: If nameserver is 'name1', use 'conversations_name1'")
+	fmt.Println("  Use .tables to see all available tables")
 }
