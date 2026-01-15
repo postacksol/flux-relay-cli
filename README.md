@@ -71,7 +71,7 @@ flux-relay install
 
 1. **List all projects:**
    ```bash
-   flux-relay projects list
+   flux-relay pr list
    ```
    Shows all projects in your account with details like ID, name, description, and creation date.
 
@@ -95,7 +95,7 @@ flux-relay install
 - `flux-relay login --headless` - Headless authentication mode
 - `flux-relay logout` - Log out and remove stored token
 - `flux-relay config set token <token>` - Set access token manually
-- `flux-relay projects list` - List all projects in your account
+- `flux-relay pr list` - List all projects in your account
 - `flux-relay pr <project-name-or-id>` - Select a project to work with
 - `flux-relay pr` - Show currently selected project
 - `flux-relay server list` - List all servers in the selected project (with nameserver counts)

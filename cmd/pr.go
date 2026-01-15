@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/postacksol/flux-relay-cli/internal/api"
 	"github.com/postacksol/flux-relay-cli/internal/config"
@@ -12,23 +15,31 @@ import (
 
 var prCmd = &cobra.Command{
 	Use:   "pr [project-name-or-id]",
-	Short: "Select a project (enter project context)",
-	Long: `Select a project to work with. You can use either the project name or ID.
-After selecting a project, you can use commands like 'flux-relay server list'.
+	Short: "Manage projects",
+	Long: `List and select projects to work with.
 
 Examples:
-  flux-relay pr MyProject        # Select by name
-  flux-relay pr 56OSXXQH        # Select by ID
-  flux-relay pr                  # Show current project`,
+  flux-relay pr list              # List all projects
+  flux-relay pr MyProject         # Select by name
+  flux-relay pr 56OSXXQH          # Select by ID
+  flux-relay pr                   # Show current project`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: runPr,
+	RunE: runPrShowOrSelect,
+}
+
+var prListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all projects",
+	Long:  "List all projects in your account",
+	RunE:  runPrList,
 }
 
 func init() {
+	prCmd.AddCommand(prListCmd)
 	rootCmd.AddCommand(prCmd)
 }
 
-func runPr(cmd *cobra.Command, args []string) error {
+func runPrShowOrSelect(cmd *cobra.Command, args []string) error {
 	// Get API URL
 	apiURL := apiBaseURL
 	if apiURL == "" {
@@ -55,7 +66,7 @@ func runPr(cmd *cobra.Command, args []string) error {
 			fmt.Println("  flux-relay pr <project-name-or-id>")
 			fmt.Println()
 			fmt.Println("Or list available projects:")
-			fmt.Println("  flux-relay projects list")
+			fmt.Println("  flux-relay pr list")
 			return nil
 		}
 
@@ -88,6 +99,7 @@ func runPr(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// If argument provided, treat as project selection
 	projectIdentifier := args[0]
 
 	// Get all projects
@@ -109,7 +121,7 @@ func runPr(cmd *cobra.Command, args []string) error {
 	}
 
 	if selectedProject == nil {
-		return fmt.Errorf("project '%s' not found. Use 'flux-relay projects list' to see available projects", projectIdentifier)
+		return fmt.Errorf("project '%s' not found. Use 'flux-relay pr list' to see available projects", projectIdentifier)
 	}
 
 	// Save selected project
@@ -124,6 +136,90 @@ func runPr(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("You can now use:")
 	fmt.Println("  flux-relay server list")
+
+	return nil
+}
+
+func runPrList(cmd *cobra.Command, args []string) error {
+	// Get API URL
+	apiURL := apiBaseURL
+	if apiURL == "" {
+		apiURL = viper.GetString("api_url")
+		if apiURL == "" {
+			apiURL = "http://localhost:3000"
+		}
+	}
+
+	// Get access token
+	cfg := config.New()
+	accessToken := cfg.GetAccessToken()
+	if accessToken == "" {
+		return fmt.Errorf("not logged in. Run 'flux-relay login' first")
+	}
+
+	// Create API client and list projects
+	client := api.NewClient(apiURL)
+	projectsResponse, err := client.ListProjects(accessToken)
+	if err != nil {
+		if apiErr, ok := err.(*api.APIError); ok {
+			if apiErr.Code() == "Unauthorized" || apiErr.Code() == "unauthorized" {
+				return fmt.Errorf("authentication failed. Please run 'flux-relay login' again")
+			}
+			return fmt.Errorf("API error: %w", apiErr)
+		}
+		return fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	projects := projectsResponse.Projects
+
+	if len(projects) == 0 {
+		fmt.Println("No projects found.")
+		fmt.Println()
+		fmt.Println("Create a project using the web dashboard or API.")
+		return nil
+	}
+
+	// Display projects in a table
+	fmt.Printf("Found %d project(s):\n\n", len(projects))
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "ID\tNAME\tDESCRIPTION\tCREATED\tSTATUS")
+	fmt.Fprintln(w, "──\t────\t───────────\t───────\t──────")
+
+	for _, project := range projects {
+		// Format created date
+		createdAt, err := time.Parse(time.RFC3339, project.CreatedAt)
+		createdStr := project.CreatedAt
+		if err == nil {
+			createdStr = createdAt.Format("2006-01-02")
+		}
+
+		// Truncate description if too long
+		description := project.Description
+		if len(description) > 40 {
+			description = description[:37] + "..."
+		}
+		if description == "" {
+			description = "-"
+		}
+
+		// Status
+		status := "Active"
+		if !project.IsActive {
+			status = "Inactive"
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			project.ID,
+			project.Name,
+			description,
+			createdStr,
+			status,
+		)
+	}
+
+	w.Flush()
+	fmt.Println()
 
 	return nil
 }
