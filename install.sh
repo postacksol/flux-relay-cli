@@ -58,7 +58,7 @@ if [ -z "$ASSET_URL" ]; then
     trap "rm -rf $TEMP_DIR" EXIT
     
     echo "Cloning repository..."
-    if ! git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git "$TEMP_DIR" 2>/dev/null; then
+    if ! git clone --depth 1 --branch main https://github.com/postacksol/flux-relay-cli.git "$TEMP_DIR" 2>/dev/null; then
         echo "Error: Failed to clone repository. Make sure Git is installed."
         echo "  https://git-scm.com/download/"
         exit 1

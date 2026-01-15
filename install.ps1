@@ -127,7 +127,7 @@ if (-not $asset) {
     Write-Host "Cloning repository..." -ForegroundColor Yellow
     # Suppress PowerShell error handling for git (it writes to stderr even on success)
     $ErrorActionPreference = "Continue"
-    $gitOutput = git clone --depth 1 https://github.com/postacksol/flux-relay-cli.git $tempDir 2>&1
+    $gitOutput = git clone --depth 1 --branch main https://github.com/postacksol/flux-relay-cli.git $tempDir 2>&1
     $cloneExitCode = $LASTEXITCODE
     $ErrorActionPreference = "Stop"
     
