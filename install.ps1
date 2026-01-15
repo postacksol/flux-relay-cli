@@ -212,16 +212,69 @@ if (-not $asset) {
     }
 }
 
-# Add to PATH (user-level)
+# Check for existing installations and clean up PATH
+Write-Host "Checking for existing installations..." -ForegroundColor Yellow
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$installDir*") {
-    Write-Host "Adding to PATH..." -ForegroundColor Yellow
-    [Environment]::SetEnvironmentVariable("Path", "$userPath;$installDir", "User")
-    Write-Host "Added $installDir to PATH" -ForegroundColor Green
-    Write-Host "Note: You may need to restart your terminal for PATH changes to take effect" -ForegroundColor Yellow
-} else {
-    Write-Host "Already in PATH" -ForegroundColor Green
+$pathEntries = $userPath -split ';' | Where-Object { $_ -ne '' }
+
+# Find and remove old flux-relay installations from PATH
+$cleanedPath = @()
+$removedEntries = @()
+foreach ($entry in $pathEntries) {
+    # Keep the new install directory
+    if ($entry -eq $installDir) {
+        $cleanedPath += $entry
+        continue
+    }
+    
+    # Remove old flux-relay-cli directories from PATH
+    if ($entry -like "*flux-relay*" -or $entry -like "*flux-relay-cli*") {
+        $removedEntries += $entry
+        Write-Host "  Removing old PATH entry: $entry" -ForegroundColor Gray
+        continue
+    }
+    
+    # Keep all other entries
+    $cleanedPath += $entry
 }
+
+# Add install directory if not already in cleaned path
+if ($cleanedPath -notcontains $installDir) {
+    $cleanedPath += $installDir
+}
+
+# Update PATH
+$newPath = $cleanedPath -join ';'
+[Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+
+if ($removedEntries.Count -gt 0) {
+    Write-Host "Cleaned up $($removedEntries.Count) old installation(s) from PATH" -ForegroundColor Green
+}
+
+# Also check for old binaries in common locations and warn
+$oldLocations = @(
+    "$env:USERPROFILE\go\bin\flux-relay.exe",
+    "$env:LOCALAPPDATA\flux-relay\flux-relay.exe"
+)
+
+$foundOld = $false
+foreach ($oldLoc in $oldLocations) {
+    if (Test-Path $oldLoc) {
+        Write-Host "  Found old binary at: $oldLoc" -ForegroundColor Yellow
+        $foundOld = $true
+    }
+}
+
+if ($foundOld) {
+    Write-Host ""
+    Write-Host "Note: Old binaries found. You may want to remove them to avoid conflicts." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "✅ Installation complete!" -ForegroundColor Green
+Write-Host "Binary installed to: $binPath" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Note: You may need to restart your terminal for PATH changes to take effect" -ForegroundColor Yellow
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green

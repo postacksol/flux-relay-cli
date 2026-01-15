@@ -119,26 +119,49 @@ else
     fi
 fi
 
-# Add to PATH
+# Clean up old PATH entries and add new one
+echo "Checking for existing installations..."
+
+# Detect shell
+if [[ "$SHELL" == *"zsh"* ]]; then
+    SHELL_RC="$HOME/.zshrc"
+else
+    SHELL_RC="$HOME/.bashrc"
+fi
+
+# Remove old flux-relay entries from shell RC file
+if [[ -f "$SHELL_RC" ]]; then
+    # Create backup
+    cp "$SHELL_RC" "$SHELL_RC.backup.$(date +%s)" 2>/dev/null || true
+    
+    # Remove old flux-relay PATH entries
+    sed -i.tmp '/# Flux Relay CLI/,/export PATH.*flux-relay/d' "$SHELL_RC" 2>/dev/null || \
+    sed -i '/# Flux Relay CLI/,/export PATH.*flux-relay/d' "$SHELL_RC" 2>/dev/null || true
+    rm -f "$SHELL_RC.tmp" 2>/dev/null || true
+fi
+
+# Add to PATH (always add, even if it seems to be there, to ensure it's at the end)
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding to PATH..."
-    
-    # Detect shell
-    if [[ "$SHELL" == *"zsh"* ]]; then
-        SHELL_RC="$HOME/.zshrc"
-    else
-        SHELL_RC="$HOME/.bashrc"
-    fi
-    
-    echo "" >> "$SHELL_RC"
-    echo "# Flux Relay CLI" >> "$SHELL_RC"
-    echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
-    
-    echo "Added $INSTALL_DIR to PATH in $SHELL_RC"
-    echo "Run: source $SHELL_RC (or restart your terminal)"
 else
-    echo "Already in PATH"
+    echo "Updating PATH entry..."
 fi
+
+# Remove any existing Flux Relay CLI section and add fresh one
+if [[ -f "$SHELL_RC" ]]; then
+    # Remove old entries
+    grep -v "Flux Relay CLI" "$SHELL_RC" > "$SHELL_RC.tmp" 2>/dev/null || cp "$SHELL_RC" "$SHELL_RC.tmp"
+    grep -v "flux-relay" "$SHELL_RC.tmp" > "$SHELL_RC" 2>/dev/null || cp "$SHELL_RC.tmp" "$SHELL_RC"
+    rm -f "$SHELL_RC.tmp" 2>/dev/null || true
+fi
+
+# Add new entry
+echo "" >> "$SHELL_RC"
+echo "# Flux Relay CLI" >> "$SHELL_RC"
+echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
+
+echo "✅ Updated PATH in $SHELL_RC"
+echo "Run: source $SHELL_RC (or restart your terminal)"
 
 echo ""
 echo "Installation complete!"
