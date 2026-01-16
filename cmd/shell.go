@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 
 	"github.com/postacksol/flux-relay-cli/internal/api"
@@ -163,6 +165,28 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 	scanner := bufio.NewScanner(os.Stdin)
 	var currentQuery strings.Builder
 
+	// Set up signal handler for Ctrl+C (like Turso - doesn't exit)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT)
+
+	// Handle Ctrl+C in a goroutine
+	go func() {
+		for range sigChan {
+			if currentQuery.Len() > 0 {
+				// Clear current query if one is in progress
+				currentQuery.Reset()
+				fmt.Println()
+				fmt.Println("^C")
+				fmt.Println("Query cancelled.")
+			} else {
+				// Just show a message, don't exit
+				fmt.Println()
+				fmt.Println("^C")
+				fmt.Println("Use '.quit' to exit the shell.")
+			}
+		}
+	}()
+
 	for {
 		// Show prompt
 		if currentQuery.Len() == 0 {
@@ -210,8 +234,7 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				currentQuery.Reset()
 				fmt.Println("Query cleared.")
 			case cmd == ".tables":
-				// List all tables, including nameserver-specific ones
-				executeQuery(client, accessToken, projectID, serverID, 
+				executeQuery(client, accessToken, projectID, serverID,
 					"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 			case cmd == ".nameservers" || cmd == ".ns":
 				// List available nameservers for context
@@ -233,7 +256,7 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				parts := strings.Fields(cmd)
 				if len(parts) > 1 {
 					tableName := parts[1]
-					executeQuery(client, accessToken, projectID, serverID, 
+					executeQuery(client, accessToken, projectID, serverID,
 						fmt.Sprintf("SELECT sql FROM sqlite_master WHERE type='table' AND name = '%s'", tableName))
 				} else {
 					fmt.Println("Usage: .schema <table_name>")
@@ -260,15 +283,15 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 			// Remove trailing semicolon
 			query = strings.TrimSuffix(query, ";")
 			query = strings.TrimSpace(query)
-			
+
 			// Remove surrounding quotes if present
 			if len(query) >= 2 {
 				if (query[0] == '"' && query[len(query)-1] == '"') ||
-				   (query[0] == '\'' && query[len(query)-1] == '\'') {
+					(query[0] == '\'' && query[len(query)-1] == '\'') {
 					query = query[1 : len(query)-1]
 				}
 			}
-			
+
 			if query != "" {
 				executeQuery(client, accessToken, projectID, serverID, query)
 			}
@@ -286,7 +309,7 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 // executeQuery executes a SQL query and displays results
 func executeQuery(client *api.Client, accessToken, projectID, serverID, query string) {
 	queryArgs := []interface{}{}
-	
+
 	queryResponse, err := client.ExecuteQuery(accessToken, projectID, serverID, query, queryArgs)
 	if err != nil {
 		if apiErr, ok := err.(*api.APIError); ok {
@@ -315,17 +338,17 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		
+
 		// Print header
 		fmt.Fprintln(w, strings.Join(queryResponse.Columns, "\t"))
-		
+
 		// Print separator
 		separator := make([]string, len(queryResponse.Columns))
 		for i := range separator {
 			separator[i] = "──"
 		}
 		fmt.Fprintln(w, strings.Join(separator, "\t"))
-		
+
 		// Print rows
 		for _, row := range queryResponse.Rows {
 			rowStr := make([]string, len(row))
@@ -344,7 +367,7 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 			}
 			fmt.Fprintln(w, strings.Join(rowStr, "\t"))
 		}
-		
+
 		w.Flush()
 		fmt.Println()
 		fmt.Printf("Rows returned: %d (%dms)\n", len(queryResponse.Rows), queryResponse.ExecutionTime)
