@@ -580,16 +580,28 @@ func startShellWithContext(ctx *shellContext) error {
 				}
 				
 				fmt.Printf("✅ Schema initialized for '%s'!\n", nameserverName)
-				if len(response.Tables) > 0 {
-					fmt.Printf("   Created %d tables:\n", len(response.Tables))
-					for _, table := range response.Tables {
+				if response.TablesCreated > 0 {
+					fmt.Printf("   Created %d tables\n", response.TablesCreated)
+				}
+				if len(response.VerifiedTables) > 0 {
+					fmt.Println("   Tables:")
+					for _, table := range response.VerifiedTables {
 						fmt.Printf("     - %s\n", table)
 					}
+				} else if response.TablesCreated > 0 {
+					fmt.Println("   (Tables created but list not available)")
+				}
+				if response.Note != "" {
+					fmt.Println()
+					fmt.Println("   " + response.Note)
 				}
 				fmt.Println()
 				fmt.Println("You can now:")
 				fmt.Printf("  .use %s  - Switch to this nameserver\n", nameserverName)
 				fmt.Printf("  .tables  - See all tables\n")
+				fmt.Println()
+				fmt.Println("Or create custom tables manually:")
+				fmt.Printf("  CREATE TABLE custom_table_%s (id TEXT PRIMARY KEY, server_id TEXT, data TEXT);\n", nameserverName)
 			case strings.HasPrefix(cmd, ".schema"):
 				parts := strings.Fields(cmd)
 				if len(parts) > 1 {
@@ -601,13 +613,45 @@ func startShellWithContext(ctx *shellContext) error {
 				}
 			case strings.HasPrefix(cmd, ".create_table") || strings.HasPrefix(cmd, ".create"):
 				// Helper for creating tables - shows example
-				fmt.Println("To create a table, use SQL directly:")
-				fmt.Println("  CREATE TABLE conversations_name1 (id TEXT PRIMARY KEY, server_id TEXT, ...);")
-				fmt.Println()
-				fmt.Println("Note: Table names must follow the pattern: {baseName}_{nameserverName}")
-				fmt.Println("Example: conversations_name1, messages_name1, etc.")
-				fmt.Println()
-				fmt.Println("Use .nameservers to see available nameserver names.")
+				parts := strings.Fields(cmd)
+				if len(parts) > 1 {
+					// User provided table name
+					tableName := strings.Join(parts[1:], " ")
+					if ctx.nameserverName != "" {
+						fmt.Printf("To create table '%s' for nameserver '%s', use:\n", tableName, ctx.nameserverName)
+						fmt.Printf("  CREATE TABLE %s_%s (id TEXT PRIMARY KEY, server_id TEXT, ...);\n", tableName, ctx.nameserverName)
+						fmt.Println()
+						fmt.Println("Or if you want a custom name:")
+						fmt.Printf("  CREATE TABLE %s (id TEXT PRIMARY KEY, server_id TEXT, ...);\n", tableName)
+						fmt.Println()
+						fmt.Println("Note: Table names must follow the pattern: {baseName}_{nameserverName}")
+						fmt.Println("      Or use any name - the API will validate it's for your nameserver.")
+					} else {
+						fmt.Printf("To create table '%s', first switch to a nameserver:\n", tableName)
+						fmt.Println("  .use <nameserver>")
+						fmt.Println()
+						fmt.Println("Then create the table:")
+						fmt.Printf("  CREATE TABLE %s_<nameserver> (id TEXT PRIMARY KEY, server_id TEXT, ...);\n", tableName)
+					}
+				} else {
+					// Show general help
+					fmt.Println("To create a table, use SQL directly:")
+					if ctx.nameserverName != "" {
+						fmt.Printf("  CREATE TABLE my_table_%s (id TEXT PRIMARY KEY, server_id TEXT, data TEXT);\n", ctx.nameserverName)
+						fmt.Println()
+						fmt.Printf("Current nameserver: %s\n", ctx.nameserverName)
+					} else {
+						fmt.Println("  CREATE TABLE my_table_<nameserver> (id TEXT PRIMARY KEY, server_id TEXT, ...);")
+						fmt.Println()
+						fmt.Println("First switch to a nameserver: .use <nameserver>")
+					}
+					fmt.Println()
+					fmt.Println("Note: Table names must follow the pattern: {baseName}_{nameserverName}")
+					fmt.Println("Example: conversations_name1, messages_name1, custom_table_db2, etc.")
+					fmt.Println()
+					fmt.Println("Use .nameservers to see available nameserver names.")
+					fmt.Println("Use .use <nameserver> to set the context.")
+				}
 			case strings.HasPrefix(cmd, ".drop_table") || strings.HasPrefix(cmd, ".drop"):
 				parts := strings.Fields(cmd)
 				if len(parts) > 1 {

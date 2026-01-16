@@ -535,15 +535,39 @@ func (c *Client) CreateNameserver(accessToken string, projectID string, serverID
 	return &response, nil
 }
 
+type InitializeNameserverRequest struct {
+	SchemaType   string `json:"schemaType,omitempty"`   // 'messaging', 'analytics', or 'both'
+	DropExisting bool   `json:"dropExisting,omitempty"` // Whether to drop existing tables
+}
+
 type InitializeNameserverResponse struct {
-	Message string   `json:"message"`
-	Tables  []string `json:"tables,omitempty"`
+	Message          string   `json:"message"`
+	SchemaType       string   `json:"schemaType,omitempty"`
+	TablesCreated    int      `json:"tablesCreated,omitempty"`
+	VerifiedTables   []string `json:"verifiedTables,omitempty"`
+	AllTables        []string `json:"allTables,omitempty"`
+	DatabaseName     string   `json:"databaseName,omitempty"`
+	DatabaseID       string   `json:"databaseId,omitempty"`
+	ServerID         string   `json:"serverId,omitempty"`
+	ServerName       string   `json:"serverName,omitempty"`
+	Note             string   `json:"note,omitempty"`
 }
 
 func (c *Client) InitializeNameserver(accessToken string, projectID string, serverID string, nameserverID string) (*InitializeNameserverResponse, error) {
 	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases/%s/initialize", c.BaseURL, projectID, serverID, nameserverID)
 	
-	req, err := http.NewRequest("POST", url, nil)
+	// Send request body with default schema type
+	reqBody := InitializeNameserverRequest{
+		SchemaType:   "messaging",
+		DropExisting: false,
+	}
+	
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(jsonData)))
 	if err != nil {
 		return nil, err
 	}
