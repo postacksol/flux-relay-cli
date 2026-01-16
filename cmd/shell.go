@@ -237,8 +237,36 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				currentQuery.Reset()
 				fmt.Println("Query cleared.")
 			case cmd == ".tables":
+				// Show all tables for all nameservers in this server
+				// The API automatically filters to show only nameserver-specific tables
+				databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
+				if err == nil && len(databasesResponse.Databases) > 0 {
+					// Get all nameservers
+					activeNameservers := make([]string, 0)
+					for _, db := range databasesResponse.Databases {
+						if db.IsActive {
+							activeNameservers = append(activeNameservers, db.DatabaseName)
+						}
+					}
+					
+					if len(activeNameservers) > 0 {
+						fmt.Printf("Showing tables for %d nameserver(s) in this server:\n", len(activeNameservers))
+						for _, ns := range activeNameservers {
+							fmt.Printf("  - %s\n", ns)
+						}
+						fmt.Println()
+					}
+				}
+				
+				// Query all tables - API will filter to show only nameserver-specific tables
 				executeQuery(client, accessToken, projectID, serverID,
 					"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+				
+				if err != nil {
+					fmt.Printf("\nNote: Could not list nameservers: %v\n", err)
+				} else if len(databasesResponse.Databases) == 0 {
+					fmt.Println("\nNote: No nameservers found. Initialize a nameserver to create tables.")
+				}
 			case cmd == ".nameservers" || cmd == ".ns":
 				// List available nameservers for context
 				databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
