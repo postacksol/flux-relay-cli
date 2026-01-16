@@ -397,9 +397,74 @@ func (c *Client) ExecuteQuery(accessToken string, projectID string, serverID str
 		return nil, fmt.Errorf("failed to execute query: %s", string(body))
 	}
 
-	var queryResponse QueryResponse
-	if err := json.Unmarshal(body, &queryResponse); err != nil {
+	// API may return response wrapped in "result" object or directly
+	var rawResponse map[string]interface{}
+	if err := json.Unmarshal(body, &rawResponse); err != nil {
 		return nil, err
+	}
+
+	// Check if response is wrapped in "result" object (for system queries)
+	var responseData map[string]interface{}
+	if result, ok := rawResponse["result"].(map[string]interface{}); ok {
+		responseData = result
+	} else {
+		// Direct response format
+		responseData = rawResponse
+	}
+
+	// Convert to QueryResponse
+	queryResponse := QueryResponse{
+		Success:      true, // Default to true if we got here
+		RowsAffected: 0,
+		ExecutionTime: 0,
+	}
+
+	// Extract columns
+	if cols, ok := responseData["columns"].([]interface{}); ok {
+		queryResponse.Columns = make([]string, len(cols))
+		for i, col := range cols {
+			if str, ok := col.(string); ok {
+				queryResponse.Columns[i] = str
+			}
+		}
+	}
+
+	// Extract rows
+	if rows, ok := responseData["rows"].([]interface{}); ok {
+		queryResponse.Rows = make([][]interface{}, len(rows))
+		for i, row := range rows {
+			if rowArray, ok := row.([]interface{}); ok {
+				queryResponse.Rows[i] = rowArray
+			}
+		}
+	}
+
+	// Extract execution time
+	if et, ok := responseData["executionTime"].(float64); ok {
+		queryResponse.ExecutionTime = int(et)
+	}
+
+	// Extract rows affected
+	if ra, ok := responseData["rowsAffected"].(float64); ok {
+		queryResponse.RowsAffected = int(ra)
+	}
+
+	// Extract success flag (may not be present, default to true)
+	if success, ok := responseData["success"].(bool); ok {
+		queryResponse.Success = success
+	}
+
+	// Extract error message
+	if errMsg, ok := responseData["errorMessage"].(string); ok {
+		queryResponse.ErrorMessage = errMsg
+		queryResponse.Success = false
+	}
+
+	// If no columns but we have rows, it might be a different format
+	// Try to handle empty result sets gracefully
+	if len(queryResponse.Columns) == 0 && len(queryResponse.Rows) == 0 {
+		// This is a valid empty result, not an error
+		queryResponse.Success = true
 	}
 
 	return &queryResponse, nil

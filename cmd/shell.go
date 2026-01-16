@@ -353,12 +353,20 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 		return
 	}
 
-	if !queryResponse.Success {
-		if queryResponse.ErrorMessage != "" {
-			fmt.Printf("Error: %s\n", queryResponse.ErrorMessage)
-		} else {
-			fmt.Println("Query failed")
-		}
+	// Check for errors - but also handle cases where Success might not be set but we have data
+	if !queryResponse.Success && queryResponse.ErrorMessage != "" {
+		fmt.Printf("Error: %s\n", queryResponse.ErrorMessage)
+		return
+	}
+	
+	// If Success is false but no error message, and we have no data, it might be an empty result
+	if !queryResponse.Success && queryResponse.ErrorMessage == "" && len(queryResponse.Columns) == 0 && len(queryResponse.Rows) == 0 {
+		fmt.Println("Query returned no results.")
+		fmt.Println()
+		fmt.Println("This could mean:")
+		fmt.Println("  - No tables exist yet (initialize your nameserver schema)")
+		fmt.Println("  - Tables don't match the expected pattern")
+		fmt.Println("  - Use .nameservers to see available nameservers")
 		return
 	}
 
@@ -367,6 +375,11 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 		// SELECT query - display results in table
 		if len(queryResponse.Rows) == 0 {
 			fmt.Println("No rows returned.")
+			fmt.Println()
+			fmt.Println("Note: If you expected to see tables, make sure:")
+			fmt.Println("  1. Your nameserver has been initialized")
+			fmt.Println("  2. Tables follow the pattern: {baseName}_{nameserverName}")
+			fmt.Println("  3. Use .nameservers to see available nameservers")
 			return
 		}
 
