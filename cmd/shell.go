@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"text/tabwriter"
@@ -336,6 +337,20 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 		}
 		currentQuery.WriteString(line)
 
+		// Check for incomplete queries (common patterns)
+		querySoFar := strings.TrimSpace(currentQuery.String() + " " + line)
+		queryUpper := strings.ToUpper(querySoFar)
+		
+		// Check for incomplete LIMIT clause
+		if strings.Contains(queryUpper, " LIMIT") && !strings.Contains(queryUpper, " LIMIT ") && !strings.HasSuffix(queryUpper, " LIMIT") {
+			// LIMIT with no number - check if it ends with just "LIMIT"
+			if strings.HasSuffix(strings.TrimSpace(queryUpper), "LIMIT") {
+				fmt.Println("⚠️  Incomplete query: LIMIT requires a number (e.g., LIMIT 10)")
+				fmt.Println("   Complete your query or type .clear to start over")
+				continue
+			}
+		}
+		
 		// Check if line ends with semicolon (end of query)
 		// Also handle queries that are wrapped in quotes (remove quotes)
 		trimmedLine := strings.TrimRight(line, " \t")
@@ -350,6 +365,19 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				if (query[0] == '"' && query[len(query)-1] == '"') ||
 					(query[0] == '\'' && query[len(query)-1] == '\'') {
 					query = query[1 : len(query)-1]
+				}
+			}
+
+			// Validate query completeness before executing
+			queryUpperCheck := strings.ToUpper(query)
+			if strings.Contains(queryUpperCheck, " LIMIT") {
+				// Check if LIMIT has a number after it
+				limitPattern := regexp.MustCompile(`LIMIT\s+(\d+)`)
+				if !limitPattern.MatchString(queryUpperCheck) && strings.HasSuffix(strings.TrimSpace(queryUpperCheck), "LIMIT") {
+					fmt.Println("⚠️  Error: LIMIT requires a number (e.g., LIMIT 10)")
+					fmt.Println("   Your query: " + query)
+					currentQuery.Reset()
+					continue
 				}
 			}
 
@@ -374,7 +402,28 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 	queryResponse, err := client.ExecuteQuery(accessToken, projectID, serverID, query, queryArgs)
 	if err != nil {
 		if apiErr, ok := err.(*api.APIError); ok {
-			fmt.Printf("Error: %s\n", apiErr.Error())
+			errorMsg := apiErr.Error()
+			fmt.Printf("Error: %s\n", errorMsg)
+			
+			// Provide helpful hints for common errors
+			if strings.Contains(errorMsg, "SQL_PARSE_ERROR") || strings.Contains(errorMsg, "unexpected end of input") {
+				fmt.Println()
+				fmt.Println("💡 Common causes:")
+				fmt.Println("  - Incomplete query (e.g., LIMIT without a number)")
+				fmt.Println("  - Missing semicolon or closing parenthesis")
+				fmt.Println("  - Typo in SQL syntax")
+				fmt.Println()
+				fmt.Println("Example: SELECT * FROM table WHERE server_id = ? LIMIT 10;")
+			} else if strings.Contains(errorMsg, "no such table") {
+				fmt.Println()
+				fmt.Println("💡 Make sure:")
+				fmt.Println("  - Table name includes nameserver suffix (e.g., conversations_name1)")
+				fmt.Println("  - Use .tables to see available tables")
+				fmt.Println("  - Use .nameservers to see nameserver names")
+			} else if strings.Contains(errorMsg, "server_id") {
+				fmt.Println()
+				fmt.Println("💡 Remember: All queries must include WHERE server_id = ?")
+			}
 		} else {
 			fmt.Printf("Error: %v\n", err)
 		}
