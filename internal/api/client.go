@@ -469,3 +469,111 @@ func (c *Client) ExecuteQuery(accessToken string, projectID string, serverID str
 
 	return &queryResponse, nil
 }
+
+type CreateNameserverRequest struct {
+	DatabaseName string `json:"databaseName"`
+	DatabaseURL  string `json:"databaseUrl,omitempty"`
+	DatabaseToken string `json:"databaseToken,omitempty"`
+}
+
+type CreateNameserverResponse struct {
+	Database struct {
+		ID           string `json:"id"`
+		DatabaseName string `json:"databaseName"`
+		DatabaseURL  string `json:"databaseUrl"`
+		HasToken     bool   `json:"hasToken"`
+		CreatedAt    string `json:"createdAt"`
+		IsActive     bool   `json:"isActive"`
+	} `json:"database"`
+	Message string `json:"message"`
+}
+
+func (c *Client) CreateNameserver(accessToken string, projectID string, serverID string, nameserverName string) (*CreateNameserverResponse, error) {
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases", c.BaseURL, projectID, serverID)
+	
+	reqBody := CreateNameserverRequest{
+		DatabaseName: nameserverName,
+	}
+	
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to create nameserver: %s", string(body))
+	}
+
+	var response CreateNameserverResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+type InitializeNameserverResponse struct {
+	Message string   `json:"message"`
+	Tables  []string `json:"tables,omitempty"`
+}
+
+func (c *Client) InitializeNameserver(accessToken string, projectID string, serverID string, nameserverID string) (*InitializeNameserverResponse, error) {
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases/%s/initialize", c.BaseURL, projectID, serverID, nameserverID)
+	
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		var apiErr APIError
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			return nil, &apiErr
+		}
+		return nil, fmt.Errorf("failed to initialize nameserver: %s", string(body))
+	}
+
+	var response InitializeNameserverResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}

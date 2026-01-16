@@ -141,12 +141,53 @@ func runNameserverShell(nameserverIdentifier string) error {
 	return startShell(cfg, client, accessToken, projectID, serverID, serverName, selectedNameserver.DatabaseName)
 }
 
+// Shell context to track current nameserver
+type shellContext struct {
+	projectID      string
+	serverID       string
+	serverName     string
+	nameserverID   string
+	nameserverName string
+	client         *api.Client
+	accessToken    string
+	cfg            *config.ConfigManager
+}
+
 // startShell runs the interactive SQL shell
 func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, projectID, serverID, serverName, nameserverName string) error {
-	// Print welcome message
-	fmt.Printf("Connected to %s", serverName)
+	// Get nameserver ID if nameserver name is provided
+	var nameserverID string
 	if nameserverName != "" {
-		fmt.Printf(" (nameserver: %s)", nameserverName)
+		databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
+		if err == nil {
+			for _, db := range databasesResponse.Databases {
+				if db.DatabaseName == nameserverName {
+					nameserverID = db.ID
+					break
+				}
+			}
+		}
+	}
+
+	ctx := &shellContext{
+		projectID:      projectID,
+		serverID:       serverID,
+		serverName:     serverName,
+		nameserverID:   nameserverID,
+		nameserverName: nameserverName,
+		client:         client,
+		accessToken:    accessToken,
+		cfg:            cfg,
+	}
+
+	return startShellWithContext(ctx)
+}
+
+func startShellWithContext(ctx *shellContext) error {
+	// Print welcome message
+	fmt.Printf("Connected to %s", ctx.serverName)
+	if ctx.nameserverName != "" {
+		fmt.Printf(" (nameserver: %s)", ctx.nameserverName)
 	}
 	fmt.Println()
 	fmt.Println()
@@ -156,10 +197,16 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 	fmt.Println()
 	fmt.Println("Enter SQL queries directly (no 'sql' prefix needed).")
 	fmt.Println("End queries with semicolon (;) or press Enter twice to execute.")
-	if nameserverName != "" {
+	if ctx.nameserverName != "" {
 		fmt.Println()
-		fmt.Printf("Note: Tables use nameserver suffix. Example: conversations_%s\n", nameserverName)
+		fmt.Printf("📌 Current nameserver: %s\n", ctx.nameserverName)
+		fmt.Printf("Note: Tables use nameserver suffix. Example: conversations_%s\n", ctx.nameserverName)
 		fmt.Println("Use .tables to see all available tables.")
+	} else {
+		fmt.Println()
+		fmt.Println("📌 Server context: All nameservers")
+		fmt.Println("Use .nameservers to see available nameservers")
+		fmt.Println("Use .use <nameserver> to switch to a specific nameserver")
 	}
 	fmt.Println()
 
@@ -209,7 +256,7 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				// Empty line after query - execute it
 				query := strings.TrimSpace(currentQuery.String())
 				if query != "" {
-					executeQuery(client, accessToken, projectID, serverID, query)
+					executeQuery(ctx.client, ctx.accessToken, ctx.projectID, ctx.serverID, query)
 				}
 				currentQuery.Reset()
 			}
@@ -237,10 +284,20 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 			case cmd == ".clear" || cmd == ".c":
 				currentQuery.Reset()
 				fmt.Println("Query cleared.")
+			case cmd == ".context" || cmd == ".ctx":
+				// Show current context
+				fmt.Printf("Current context:\n")
+				fmt.Printf("  Server: %s (%s)\n", ctx.serverName, ctx.serverID)
+				if ctx.nameserverName != "" {
+					fmt.Printf("  Nameserver: %s (%s)\n", ctx.nameserverName, ctx.nameserverID)
+					fmt.Printf("  Table suffix: conversations_%s\n", ctx.nameserverName)
+				} else {
+					fmt.Println("  Nameserver: (none - all nameservers)")
+				}
 			case cmd == ".tables":
 				// Show all tables for all nameservers in this server
 				// The API automatically filters to show only nameserver-specific tables
-				databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
+				databasesResponse, err := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
 				if err == nil && len(databasesResponse.Databases) > 0 {
 					// Get all nameservers
 					activeNameservers := make([]string, 0)
@@ -253,42 +310,186 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 					if len(activeNameservers) > 0 {
 						fmt.Printf("Showing tables for %d nameserver(s) in this server:\n", len(activeNameservers))
 						for _, ns := range activeNameservers {
-							fmt.Printf("  - %s\n", ns)
+							marker := "  "
+							if ctx.nameserverName == ns {
+								marker = "→ "
+							}
+							fmt.Printf("%s%s\n", marker, ns)
 						}
 						fmt.Println()
 					}
 				}
 				
 				// Query all tables - API will filter to show only nameserver-specific tables
-				executeQuery(client, accessToken, projectID, serverID,
+				executeQuery(ctx.client, ctx.accessToken, ctx.projectID, ctx.serverID,
 					"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 				
 				if err != nil {
 					fmt.Printf("\nNote: Could not list nameservers: %v\n", err)
 				} else if len(databasesResponse.Databases) == 0 {
-					fmt.Println("\nNote: No nameservers found. Initialize a nameserver to create tables.")
+					fmt.Println("\nNote: No nameservers found. Create one with: .create_ns <name>")
 				}
-			case cmd == ".nameservers" || cmd == ".ns":
+				case cmd == ".nameservers" || cmd == ".ns":
 				// List available nameservers for context
-				databasesResponse, err := client.ListDatabases(accessToken, projectID, serverID)
+				databasesResponse, err := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
 				if err == nil {
 					fmt.Println("Available nameservers:")
 					for _, db := range databasesResponse.Databases {
+						marker := "  "
+						if ctx.nameserverID == db.ID {
+							marker = "→ "
+						}
 						if db.IsActive {
-							fmt.Printf("  - %s (ID: %s)\n", db.DatabaseName, db.ID)
+							fmt.Printf("%s%s (ID: %s)\n", marker, db.DatabaseName, db.ID)
 						}
 					}
 					fmt.Println()
 					fmt.Println("Note: Tables are named like: conversations_{nameserver_name}")
 					fmt.Println("Example: If nameserver is 'name1', use 'conversations_name1'")
+					fmt.Println()
+					fmt.Println("Commands:")
+					fmt.Println("  .use <nameserver>  - Switch to a nameserver context")
+					fmt.Println("  .create_ns <name>  - Create a new nameserver")
 				} else {
 					fmt.Printf("Error listing nameservers: %v\n", err)
 				}
+			case strings.HasPrefix(cmd, ".use"):
+				parts := strings.Fields(cmd)
+				if len(parts) > 1 {
+					nameserverName := parts[1]
+					// Find nameserver
+					databasesResponse, err := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
+					if err != nil {
+						fmt.Printf("Error: %v\n", err)
+						break
+					}
+					
+					var found *api.Database
+					for i := range databasesResponse.Databases {
+						db := &databasesResponse.Databases[i]
+						if db.DatabaseName == nameserverName || db.ID == nameserverName {
+							found = db
+							break
+						}
+					}
+					
+					if found == nil {
+						fmt.Printf("Nameserver '%s' not found. Use .nameservers to see available nameservers.\n", nameserverName)
+					} else {
+						ctx.nameserverID = found.ID
+						ctx.nameserverName = found.DatabaseName
+						fmt.Printf("✅ Switched to nameserver: %s\n", found.DatabaseName)
+						fmt.Printf("   Tables will use suffix: conversations_%s\n", found.DatabaseName)
+					}
+				} else {
+					if ctx.nameserverName != "" {
+						fmt.Printf("Current nameserver: %s\n", ctx.nameserverName)
+					} else {
+						fmt.Println("No nameserver selected. Use .use <nameserver> to select one.")
+					}
+				}
+			case strings.HasPrefix(cmd, ".create_ns") || strings.HasPrefix(cmd, ".create_nameserver"):
+				parts := strings.Fields(cmd)
+				if len(parts) > 1 {
+					nameserverName := strings.Join(parts[1:], " ")
+					if nameserverName == "" {
+						fmt.Println("Usage: .create_ns <nameserver_name>")
+						fmt.Println("Example: .create_ns db2")
+						break
+					}
+					
+					fmt.Printf("Creating nameserver '%s'...\n", nameserverName)
+					response, err := ctx.client.CreateNameserver(ctx.accessToken, ctx.projectID, ctx.serverID, nameserverName)
+					if err != nil {
+						if apiErr, ok := err.(*api.APIError); ok {
+							fmt.Printf("Error: %s\n", apiErr.Error())
+						} else {
+							fmt.Printf("Error: %v\n", err)
+						}
+						break
+					}
+					
+					fmt.Printf("✅ Nameserver '%s' created successfully!\n", response.Database.DatabaseName)
+					fmt.Printf("   ID: %s\n", response.Database.ID)
+					fmt.Println()
+					fmt.Println("Next steps:")
+					fmt.Println("  1. Initialize schema: .init_ns " + response.Database.DatabaseName)
+					fmt.Println("  2. Switch to it: .use " + response.Database.DatabaseName)
+					fmt.Println("  3. Create tables: CREATE TABLE conversations_" + response.Database.DatabaseName + " (...);")
+				} else {
+					fmt.Println("Usage: .create_ns <nameserver_name>")
+					fmt.Println("Example: .create_ns db2")
+					fmt.Println()
+					fmt.Println("This creates a new nameserver in the current server.")
+				}
+			case strings.HasPrefix(cmd, ".init_ns") || strings.HasPrefix(cmd, ".init_nameserver") || strings.HasPrefix(cmd, ".initialize"):
+				parts := strings.Fields(cmd)
+				var nameserverID string
+				var nameserverName string
+				
+				if len(parts) > 1 {
+					nameserverIdentifier := strings.Join(parts[1:], " ")
+					// Find nameserver
+					databasesResponse, err := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
+					if err != nil {
+						fmt.Printf("Error: %v\n", err)
+						break
+					}
+					
+					var found *api.Database
+					for i := range databasesResponse.Databases {
+						db := &databasesResponse.Databases[i]
+						if db.DatabaseName == nameserverIdentifier || db.ID == nameserverIdentifier {
+							found = db
+							break
+						}
+					}
+					
+					if found == nil {
+						fmt.Printf("Nameserver '%s' not found.\n", nameserverIdentifier)
+						break
+					}
+					
+					nameserverID = found.ID
+					nameserverName = found.DatabaseName
+				} else if ctx.nameserverID != "" {
+					nameserverID = ctx.nameserverID
+					nameserverName = ctx.nameserverName
+				} else {
+					fmt.Println("Usage: .init_ns <nameserver_name>")
+					fmt.Println("Example: .init_ns name1")
+					fmt.Println()
+					fmt.Println("Or switch to a nameserver first: .use name1")
+					break
+				}
+				
+				fmt.Printf("Initializing schema for nameserver '%s'...\n", nameserverName)
+				response, err := ctx.client.InitializeNameserver(ctx.accessToken, ctx.projectID, ctx.serverID, nameserverID)
+				if err != nil {
+					if apiErr, ok := err.(*api.APIError); ok {
+						fmt.Printf("Error: %s\n", apiErr.Error())
+					} else {
+						fmt.Printf("Error: %v\n", err)
+					}
+					break
+				}
+				
+				fmt.Printf("✅ Schema initialized for '%s'!\n", nameserverName)
+				if len(response.Tables) > 0 {
+					fmt.Printf("   Created %d tables:\n", len(response.Tables))
+					for _, table := range response.Tables {
+						fmt.Printf("     - %s\n", table)
+					}
+				}
+				fmt.Println()
+				fmt.Println("You can now:")
+				fmt.Printf("  .use %s  - Switch to this nameserver\n", nameserverName)
+				fmt.Printf("  .tables  - See all tables\n")
 			case strings.HasPrefix(cmd, ".schema"):
 				parts := strings.Fields(cmd)
 				if len(parts) > 1 {
 					tableName := parts[1]
-					executeQuery(client, accessToken, projectID, serverID,
+					executeQuery(ctx.client, ctx.accessToken, ctx.projectID, ctx.serverID,
 						fmt.Sprintf("SELECT sql FROM sqlite_master WHERE type='table' AND name = '%s'", tableName))
 				} else {
 					fmt.Println("Usage: .schema <table_name>")
@@ -310,11 +511,15 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 					fmt.Printf("  DROP TABLE %s;\n", tableName)
 					fmt.Println()
 					fmt.Println("Or execute directly:")
-					executeQuery(client, accessToken, projectID, serverID,
+					executeQuery(ctx.client, ctx.accessToken, ctx.projectID, ctx.serverID,
 						fmt.Sprintf("DROP TABLE %s", tableName))
 				} else {
 					fmt.Println("Usage: .drop_table <table_name>")
-					fmt.Println("Example: .drop_table conversations_name1")
+					if ctx.nameserverName != "" {
+						fmt.Printf("Example: .drop_table conversations_%s\n", ctx.nameserverName)
+					} else {
+						fmt.Println("Example: .drop_table conversations_name1")
+					}
 				}
 			case strings.HasPrefix(cmd, ".alter_table") || strings.HasPrefix(cmd, ".alter"):
 				// Helper for altering tables - shows example
@@ -331,61 +536,61 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 			continue
 		}
 
-		// Add line to current query
-		if currentQuery.Len() > 0 {
-			currentQuery.WriteString(" ")
-		}
-		currentQuery.WriteString(line)
-
-		// Check for incomplete queries (common patterns)
-		querySoFar := strings.TrimSpace(currentQuery.String() + " " + line)
-		queryUpper := strings.ToUpper(querySoFar)
-		
-		// Check for incomplete LIMIT clause
-		if strings.Contains(queryUpper, " LIMIT") && !strings.Contains(queryUpper, " LIMIT ") && !strings.HasSuffix(queryUpper, " LIMIT") {
-			// LIMIT with no number - check if it ends with just "LIMIT"
-			if strings.HasSuffix(strings.TrimSpace(queryUpper), "LIMIT") {
-				fmt.Println("⚠️  Incomplete query: LIMIT requires a number (e.g., LIMIT 10)")
-				fmt.Println("   Complete your query or type .clear to start over")
-				continue
+			// Add line to current query
+			if currentQuery.Len() > 0 {
+				currentQuery.WriteString(" ")
 			}
-		}
-		
-		// Check if line ends with semicolon (end of query)
-		// Also handle queries that are wrapped in quotes (remove quotes)
-		trimmedLine := strings.TrimRight(line, " \t")
-		if strings.HasSuffix(trimmedLine, ";") {
-			query := strings.TrimSpace(currentQuery.String())
-			// Remove trailing semicolon
-			query = strings.TrimSuffix(query, ";")
-			query = strings.TrimSpace(query)
+			currentQuery.WriteString(line)
 
-			// Remove surrounding quotes if present
-			if len(query) >= 2 {
-				if (query[0] == '"' && query[len(query)-1] == '"') ||
-					(query[0] == '\'' && query[len(query)-1] == '\'') {
-					query = query[1 : len(query)-1]
-				}
-			}
-
-			// Validate query completeness before executing
-			queryUpperCheck := strings.ToUpper(query)
-			if strings.Contains(queryUpperCheck, " LIMIT") {
-				// Check if LIMIT has a number after it
-				limitPattern := regexp.MustCompile(`LIMIT\s+(\d+)`)
-				if !limitPattern.MatchString(queryUpperCheck) && strings.HasSuffix(strings.TrimSpace(queryUpperCheck), "LIMIT") {
-					fmt.Println("⚠️  Error: LIMIT requires a number (e.g., LIMIT 10)")
-					fmt.Println("   Your query: " + query)
-					currentQuery.Reset()
+			// Check for incomplete queries (common patterns)
+			querySoFar := strings.TrimSpace(currentQuery.String() + " " + line)
+			queryUpper := strings.ToUpper(querySoFar)
+			
+			// Check for incomplete LIMIT clause
+			if strings.Contains(queryUpper, " LIMIT") && !strings.Contains(queryUpper, " LIMIT ") && !strings.HasSuffix(queryUpper, " LIMIT") {
+				// LIMIT with no number - check if it ends with just "LIMIT"
+				if strings.HasSuffix(strings.TrimSpace(queryUpper), "LIMIT") {
+					fmt.Println("⚠️  Incomplete query: LIMIT requires a number (e.g., LIMIT 10)")
+					fmt.Println("   Complete your query or type .clear to start over")
 					continue
 				}
 			}
+			
+			// Check if line ends with semicolon (end of query)
+			// Also handle queries that are wrapped in quotes (remove quotes)
+			trimmedLine := strings.TrimRight(line, " \t")
+			if strings.HasSuffix(trimmedLine, ";") {
+				query := strings.TrimSpace(currentQuery.String())
+				// Remove trailing semicolon
+				query = strings.TrimSuffix(query, ";")
+				query = strings.TrimSpace(query)
 
-			if query != "" {
-				executeQuery(client, accessToken, projectID, serverID, query)
+				// Remove surrounding quotes if present
+				if len(query) >= 2 {
+					if (query[0] == '"' && query[len(query)-1] == '"') ||
+						(query[0] == '\'' && query[len(query)-1] == '\'') {
+						query = query[1 : len(query)-1]
+					}
+				}
+
+				// Validate query completeness before executing
+				queryUpperCheck := strings.ToUpper(query)
+				if strings.Contains(queryUpperCheck, " LIMIT") {
+					// Check if LIMIT has a number after it
+					limitPattern := regexp.MustCompile(`LIMIT\s+(\d+)`)
+					if !limitPattern.MatchString(queryUpperCheck) && strings.HasSuffix(strings.TrimSpace(queryUpperCheck), "LIMIT") {
+						fmt.Println("⚠️  Error: LIMIT requires a number (e.g., LIMIT 10)")
+						fmt.Println("   Your query: " + query)
+						currentQuery.Reset()
+						continue
+					}
+				}
+
+				if query != "" {
+					executeQuery(ctx.client, ctx.accessToken, ctx.projectID, ctx.serverID, query)
+				}
+				currentQuery.Reset()
 			}
-			currentQuery.Reset()
-		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -504,14 +709,18 @@ func executeQuery(client *api.Client, accessToken, projectID, serverID, query st
 // printHelp displays available shell commands
 func printHelp() {
 	fmt.Println("Available commands:")
-	fmt.Println("  .help, .h          Show this help message")
-	fmt.Println("  .examples, .ex     Show example queries and operations")
-	fmt.Println("  .quit, .exit, .q  Exit the shell")
-	fmt.Println("  .clear, .c        Clear the current query")
-	fmt.Println("  .tables           List all tables")
-	fmt.Println("  .schema <table>   Show schema for a table")
-	fmt.Println("  .nameservers, .ns List available nameservers")
-	fmt.Println("  .drop_table <name> Drop a table (with confirmation)")
+	fmt.Println("  .help, .h              Show this help message")
+	fmt.Println("  .examples, .ex         Show example queries and operations")
+	fmt.Println("  .quit, .exit, .q      Exit the shell")
+	fmt.Println("  .clear, .c            Clear the current query")
+	fmt.Println("  .context, .ctx        Show current context (server/nameserver)")
+	fmt.Println("  .tables               List all tables")
+	fmt.Println("  .schema <table>       Show schema for a table")
+	fmt.Println("  .nameservers, .ns     List available nameservers")
+	fmt.Println("  .use <nameserver>     Switch to a nameserver context")
+	fmt.Println("  .create_ns <name>     Create a new nameserver")
+	fmt.Println("  .init_ns <name>       Initialize schema for a nameserver")
+	fmt.Println("  .drop_table <name>    Drop a table")
 	fmt.Println()
 	fmt.Println("SQL queries:")
 	fmt.Println("  Enter SQL queries directly. End with semicolon (;) or empty line to execute.")
@@ -526,6 +735,11 @@ func printHelp() {
 	fmt.Println("  Tables are named with nameserver suffix: conversations_{nameserver_name}")
 	fmt.Println("  Example: If nameserver is 'name1', use 'conversations_name1'")
 	fmt.Println("  Use .tables to see all available tables")
+	fmt.Println()
+	fmt.Println("Nameserver management:")
+	fmt.Println("  .create_ns <name>  - Create a new nameserver")
+	fmt.Println("  .init_ns <name>    - Initialize default schema (creates standard tables)")
+	fmt.Println("  .use <name>        - Switch context to a nameserver")
 	fmt.Println()
 	fmt.Println("Security:")
 	fmt.Println("  You can only create/modify tables for your server's nameservers")
