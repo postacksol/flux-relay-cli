@@ -333,17 +333,50 @@ func startShellWithContext(ctx *shellContext) error {
 				// List available nameservers for context
 				databasesResponse, err := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
 				if err == nil {
-					fmt.Println("Available nameservers:")
+					activeCount := 0
+					inactiveCount := 0
+					
+					// Count first
 					for _, db := range databasesResponse.Databases {
-						marker := "  "
-						if ctx.nameserverID == db.ID {
-							marker = "→ "
-						}
 						if db.IsActive {
-							fmt.Printf("%s%s (ID: %s)\n", marker, db.DatabaseName, db.ID)
+							activeCount++
+						} else {
+							inactiveCount++
 						}
 					}
-					fmt.Println()
+					
+					if activeCount > 0 {
+						fmt.Println("Active nameservers:")
+						for _, db := range databasesResponse.Databases {
+							if db.IsActive {
+								marker := "  "
+								if ctx.nameserverID == db.ID {
+									marker = "→ "
+								}
+								fmt.Printf("%s%s (ID: %s)\n", marker, db.DatabaseName, db.ID)
+							}
+						}
+						fmt.Println()
+					}
+					
+					if inactiveCount > 0 {
+						fmt.Println("Inactive (soft-deleted) nameservers:")
+						for _, db := range databasesResponse.Databases {
+							if !db.IsActive {
+								fmt.Printf("  %s (ID: %s) [inactive]\n", db.DatabaseName, db.ID)
+							}
+						}
+						fmt.Println()
+						fmt.Println("Note: Inactive nameservers can prevent creating new ones with the same name.")
+						fmt.Println("      The system will reactivate them if you try to create a duplicate.")
+						fmt.Println()
+					}
+					
+					if activeCount == 0 && inactiveCount == 0 {
+						fmt.Println("No nameservers found.")
+						fmt.Println()
+					}
+					
 					fmt.Println("Note: Tables are named like: conversations_{nameserver_name}")
 					fmt.Println("Example: If nameserver is 'name1', use 'conversations_name1'")
 					fmt.Println()
@@ -398,11 +431,41 @@ func startShellWithContext(ctx *shellContext) error {
 						break
 					}
 					
+					// First, check existing nameservers to help debug conflicts
+					databasesResponse, listErr := ctx.client.ListDatabases(ctx.accessToken, ctx.projectID, ctx.serverID)
+					if listErr == nil && len(databasesResponse.Databases) > 0 {
+						// Check for case-insensitive match
+						requestedLower := strings.ToLower(nameserverName)
+						for _, db := range databasesResponse.Databases {
+							if strings.ToLower(db.DatabaseName) == requestedLower {
+								fmt.Printf("⚠️  Conflict: A nameserver with a similar name already exists:\n")
+								fmt.Printf("   Requested: '%s'\n", nameserverName)
+								fmt.Printf("   Existing:  '%s' (ID: %s)\n", db.DatabaseName, db.ID)
+								fmt.Println()
+								fmt.Println("Note: Nameserver names are case-sensitive but may conflict due to database constraints.")
+								fmt.Println("      Use .nameservers to see all existing nameservers.")
+								break
+							}
+						}
+					}
+					
 					fmt.Printf("Creating nameserver '%s'...\n", nameserverName)
 					response, err := ctx.client.CreateNameserver(ctx.accessToken, ctx.projectID, ctx.serverID, nameserverName)
 					if err != nil {
 						if apiErr, ok := err.(*api.APIError); ok {
 							fmt.Printf("Error: %s\n", apiErr.Error())
+							fmt.Println()
+							// Show existing nameservers to help user
+							if listErr == nil && len(databasesResponse.Databases) > 0 {
+								fmt.Println("Existing nameservers in this server:")
+								for _, db := range databasesResponse.Databases {
+									if db.IsActive {
+										fmt.Printf("  - %s (ID: %s)\n", db.DatabaseName, db.ID)
+									}
+								}
+								fmt.Println()
+								fmt.Println("Tip: Use .nameservers to see all nameservers, including inactive ones.")
+							}
 						} else {
 							fmt.Printf("Error: %v\n", err)
 						}
@@ -421,6 +484,8 @@ func startShellWithContext(ctx *shellContext) error {
 					fmt.Println("Example: .create_ns db2")
 					fmt.Println()
 					fmt.Println("This creates a new nameserver in the current server.")
+					fmt.Println()
+					fmt.Println("Use .nameservers to see existing nameservers first.")
 				}
 			case strings.HasPrefix(cmd, ".init_ns") || strings.HasPrefix(cmd, ".init_nameserver") || strings.HasPrefix(cmd, ".initialize"):
 				parts := strings.Fields(cmd)
