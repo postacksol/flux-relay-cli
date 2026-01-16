@@ -438,13 +438,27 @@ func startShellWithContext(ctx *shellContext) error {
 						requestedLower := strings.ToLower(nameserverName)
 						for _, db := range databasesResponse.Databases {
 							if strings.ToLower(db.DatabaseName) == requestedLower {
-								fmt.Printf("⚠️  Conflict: A nameserver with a similar name already exists:\n")
-								fmt.Printf("   Requested: '%s'\n", nameserverName)
-								fmt.Printf("   Existing:  '%s' (ID: %s)\n", db.DatabaseName, db.ID)
-								fmt.Println()
-								fmt.Println("Note: Nameserver names are case-sensitive but may conflict due to database constraints.")
-								fmt.Println("      Use .nameservers to see all existing nameservers.")
-								break
+								if db.DatabaseName == nameserverName {
+									// Exact match
+									if db.IsActive {
+										fmt.Printf("⚠️  Nameserver '%s' already exists and is active.\n", db.DatabaseName)
+										fmt.Printf("   ID: %s\n", db.ID)
+										fmt.Println()
+										fmt.Println("Use .use " + db.DatabaseName + " to switch to it.")
+									} else {
+										fmt.Printf("⚠️  Found inactive nameserver '%s' - will be reactivated.\n", db.DatabaseName)
+										fmt.Printf("   ID: %s\n", db.ID)
+									}
+								} else {
+									// Case-insensitive match but different case
+									fmt.Printf("⚠️  Conflict: A nameserver with a similar name already exists:\n")
+									fmt.Printf("   Requested: '%s'\n", nameserverName)
+									fmt.Printf("   Existing:  '%s' (ID: %s)\n", db.DatabaseName, db.ID)
+									fmt.Println()
+									fmt.Println("Note: Nameserver names are case-insensitive in the database.")
+									fmt.Println("      Use the existing nameserver or choose a different name.")
+									break
+								}
 							}
 						}
 					}
@@ -453,18 +467,40 @@ func startShellWithContext(ctx *shellContext) error {
 					response, err := ctx.client.CreateNameserver(ctx.accessToken, ctx.projectID, ctx.serverID, nameserverName)
 					if err != nil {
 						if apiErr, ok := err.(*api.APIError); ok {
-							fmt.Printf("Error: %s\n", apiErr.Error())
+							errorMsg := apiErr.Error()
+							fmt.Printf("Error: %s\n", errorMsg)
 							fmt.Println()
+							
+							// Check if error suggests an inactive nameserver exists
+							if strings.Contains(errorMsg, "already exists") {
+								fmt.Println("💡 This error usually means:")
+								fmt.Println("   1. An active nameserver with this name exists, OR")
+								fmt.Println("   2. An inactive (soft-deleted) nameserver exists and should be reactivated")
+								fmt.Println()
+								fmt.Println("The API should automatically reactivate inactive nameservers.")
+								fmt.Println("If this keeps happening, the nameserver might be active but not visible.")
+								fmt.Println()
+								
+								// Try to query directly for the nameserver using the API
+								fmt.Println("💡 Troubleshooting tips:")
+								fmt.Println("   - The API should automatically reactivate inactive nameservers")
+								fmt.Println("   - If this error persists, there may be an active nameserver")
+								fmt.Println("     with this name that's not visible in .nameservers")
+								fmt.Println("   - Try using a different name, or contact support if needed")
+								fmt.Println()
+							}
+							
 							// Show existing nameservers to help user
 							if listErr == nil && len(databasesResponse.Databases) > 0 {
-								fmt.Println("Existing nameservers in this server:")
+								fmt.Println("Currently visible nameservers in this server:")
 								for _, db := range databasesResponse.Databases {
 									if db.IsActive {
 										fmt.Printf("  - %s (ID: %s)\n", db.DatabaseName, db.ID)
 									}
 								}
 								fmt.Println()
-								fmt.Println("Tip: Use .nameservers to see all nameservers, including inactive ones.")
+								fmt.Println("Note: Inactive nameservers may not be visible but can still block creation.")
+								fmt.Println("      The API should reactivate them automatically when you try to create.")
 							}
 						} else {
 							fmt.Printf("Error: %v\n", err)
@@ -472,13 +508,17 @@ func startShellWithContext(ctx *shellContext) error {
 						break
 					}
 					
-					fmt.Printf("✅ Nameserver '%s' created successfully!\n", response.Database.DatabaseName)
-					fmt.Printf("   ID: %s\n", response.Database.ID)
-					fmt.Println()
-					fmt.Println("Next steps:")
-					fmt.Println("  1. Initialize schema: .init_ns " + response.Database.DatabaseName)
-					fmt.Println("  2. Switch to it: .use " + response.Database.DatabaseName)
-					fmt.Println("  3. Create tables: CREATE TABLE conversations_" + response.Database.DatabaseName + " (...);")
+					// Check if it was reactivated
+					if response.Database.ID != "" {
+						// Check if this was a reactivation by looking at creation time
+						fmt.Printf("✅ Nameserver '%s' created successfully!\n", response.Database.DatabaseName)
+						fmt.Printf("   ID: %s\n", response.Database.ID)
+						fmt.Println()
+						fmt.Println("Next steps:")
+						fmt.Println("  1. Initialize schema: .init_ns " + response.Database.DatabaseName)
+						fmt.Println("  2. Switch to it: .use " + response.Database.DatabaseName)
+						fmt.Println("  3. Create tables: CREATE TABLE conversations_" + response.Database.DatabaseName + " (...);")
+					}
 				} else {
 					fmt.Println("Usage: .create_ns <nameserver_name>")
 					fmt.Println("Example: .create_ns db2")
