@@ -262,6 +262,36 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				} else {
 					fmt.Println("Usage: .schema <table_name>")
 				}
+			case strings.HasPrefix(cmd, ".create_table") || strings.HasPrefix(cmd, ".create"):
+				// Helper for creating tables - shows example
+				fmt.Println("To create a table, use SQL directly:")
+				fmt.Println("  CREATE TABLE conversations_name1 (id TEXT PRIMARY KEY, server_id TEXT, ...);")
+				fmt.Println()
+				fmt.Println("Note: Table names must follow the pattern: {baseName}_{nameserverName}")
+				fmt.Println("Example: conversations_name1, messages_name1, etc.")
+				fmt.Println()
+				fmt.Println("Use .nameservers to see available nameserver names.")
+			case strings.HasPrefix(cmd, ".drop_table") || strings.HasPrefix(cmd, ".drop"):
+				parts := strings.Fields(cmd)
+				if len(parts) > 1 {
+					tableName := parts[1]
+					fmt.Printf("To drop table '%s', use:\n", tableName)
+					fmt.Printf("  DROP TABLE %s;\n", tableName)
+					fmt.Println()
+					fmt.Println("Or execute directly:")
+					executeQuery(client, accessToken, projectID, serverID,
+						fmt.Sprintf("DROP TABLE %s", tableName))
+				} else {
+					fmt.Println("Usage: .drop_table <table_name>")
+					fmt.Println("Example: .drop_table conversations_name1")
+				}
+			case strings.HasPrefix(cmd, ".alter_table") || strings.HasPrefix(cmd, ".alter"):
+				// Helper for altering tables - shows example
+				fmt.Println("To alter a table, use SQL directly:")
+				fmt.Println("  ALTER TABLE conversations_name1 ADD COLUMN new_field TEXT;")
+				fmt.Println("  ALTER TABLE conversations_name1 RENAME COLUMN old_field TO new_field;")
+				fmt.Println()
+				fmt.Println("Note: You can only alter tables that belong to your server's nameservers.")
 			default:
 				fmt.Printf("Unknown command: %s\n", line)
 				fmt.Println("Type \".help\" for available commands.")
@@ -388,13 +418,23 @@ func printHelp() {
 	fmt.Println("  .tables           List all tables")
 	fmt.Println("  .schema <table>   Show schema for a table")
 	fmt.Println("  .nameservers, .ns List available nameservers")
+	fmt.Println("  .drop_table <name> Drop a table (with confirmation)")
 	fmt.Println()
 	fmt.Println("SQL queries:")
 	fmt.Println("  Enter SQL queries directly. End with semicolon (;) or empty line to execute.")
 	fmt.Println("  Multi-line queries are supported.")
 	fmt.Println()
+	fmt.Println("Table management:")
+	fmt.Println("  CREATE TABLE - Create new tables (must follow pattern: {baseName}_{nameserverName})")
+	fmt.Println("  ALTER TABLE  - Modify table structure (add/rename columns, etc.)")
+	fmt.Println("  DROP TABLE   - Delete tables (use .drop_table for helper)")
+	fmt.Println()
 	fmt.Println("Table naming:")
 	fmt.Println("  Tables are named with nameserver suffix: conversations_{nameserver_name}")
 	fmt.Println("  Example: If nameserver is 'name1', use 'conversations_name1'")
 	fmt.Println("  Use .tables to see all available tables")
+	fmt.Println()
+	fmt.Println("Security:")
+	fmt.Println("  You can only create/modify tables for your server's nameservers")
+	fmt.Println("  System/platform tables are not accessible")
 }
