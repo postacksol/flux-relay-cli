@@ -165,13 +165,14 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 	scanner := bufio.NewScanner(os.Stdin)
 	var currentQuery strings.Builder
 
-	// Set up signal handler for Ctrl+C (like Turso - doesn't exit)
+	// Set up signal handler for Ctrl+C (like Turso - never exits, only .quit does)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT)
 
-	// Handle Ctrl+C in a goroutine
+	// Handle Ctrl+C in a goroutine - never exits, only cancels queries
 	go func() {
-		for range sigChan {
+		for {
+			<-sigChan
 			if currentQuery.Len() > 0 {
 				// Clear current query if one is in progress
 				currentQuery.Reset()
@@ -179,7 +180,7 @@ func startShell(cfg *config.ConfigManager, client *api.Client, accessToken, proj
 				fmt.Println("^C")
 				fmt.Println("Query cancelled.")
 			} else {
-				// Just show a message, don't exit
+				// Just show a message, never exit
 				fmt.Println()
 				fmt.Println("^C")
 				fmt.Println("Use '.quit' to exit the shell.")
