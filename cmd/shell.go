@@ -13,7 +13,6 @@ import (
 
 	"github.com/postacksol/flux-relay-cli/internal/api"
 	"github.com/postacksol/flux-relay-cli/internal/config"
-	"github.com/spf13/viper"
 )
 
 // runServerShell starts an interactive shell for a server

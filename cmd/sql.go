@@ -10,7 +10,6 @@ import (
 	"github.com/postacksol/flux-relay-cli/internal/api"
 	"github.com/postacksol/flux-relay-cli/internal/config"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var sqlCmd = &cobra.Command{
