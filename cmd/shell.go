@@ -19,13 +19,7 @@ import (
 // runServerShell starts an interactive shell for a server
 func runServerShell(serverIdentifier string) error {
 	// Get API URL
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Get access token
 	cfg := config.New()
@@ -72,13 +66,7 @@ func runServerShell(serverIdentifier string) error {
 // runNameserverShell starts an interactive shell for a nameserver
 func runNameserverShell(nameserverIdentifier string) error {
 	// Get API URL
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Get access token
 	cfg := config.New()

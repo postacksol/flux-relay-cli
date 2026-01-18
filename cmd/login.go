@@ -61,15 +61,7 @@ func printLogo() {
 
 func runLogin(cmd *cobra.Command, args []string) error {
 	// Get API URL from flag, config, or default
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		// Try config file
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			// Default to localhost for development
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Check if already logged in
 	cfg := config.New()

@@ -62,13 +62,7 @@ func init() {
 
 func runServerList(cmd *cobra.Command, args []string) error {
 	// Get API URL
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Get access token
 	cfg := config.New()
@@ -215,13 +209,7 @@ func runServerList(cmd *cobra.Command, args []string) error {
 
 func runServerShowOrSelect(cmd *cobra.Command, args []string) error {
 	// Get API URL
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Get access token
 	cfg := config.New()

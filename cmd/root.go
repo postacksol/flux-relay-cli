@@ -36,7 +36,7 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.flux-relay/config.yaml)")
-	rootCmd.PersistentFlags().StringVar(&apiBaseURL, "api-url", "", "API base URL (default: http://localhost:3000 for development)")
+	rootCmd.PersistentFlags().StringVar(&apiBaseURL, "api-url", "", "API base URL (default: https://flux.postacksolutions.com)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
 	// Bind flags to viper
@@ -67,4 +67,16 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil && verbose {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+// getAPIURL returns the API URL from flag, config, or default production URL
+func getAPIURL() string {
+	if apiBaseURL != "" {
+		return apiBaseURL
+	}
+	if url := viper.GetString("api_url"); url != "" {
+		return url
+	}
+	// Default to production URL
+	return "https://flux.postacksolutions.com"
 }

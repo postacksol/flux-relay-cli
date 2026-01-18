@@ -37,15 +37,17 @@ func init() {
 
 func runConfigSetToken(cmd *cobra.Command, args []string) error {
 	token := args[0]
+	
+	// Validate token format (basic check - should be non-empty and reasonable length)
+	if len(token) == 0 {
+		return fmt.Errorf("token cannot be empty")
+	}
+	if len(token) > 1000 {
+		return fmt.Errorf("token appears to be invalid (too long)")
+	}
 
 	// Get API URL
-	apiURL := apiBaseURL
-	if apiURL == "" {
-		apiURL = viper.GetString("api_url")
-		if apiURL == "" {
-			apiURL = "http://localhost:3000"
-		}
-	}
+	apiURL := getAPIURL()
 
 	// Validate token by getting user info
 	client := api.NewClient(apiURL)
