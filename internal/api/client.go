@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -92,7 +94,13 @@ func (c *Client) InitiateDeviceCode() (*DeviceCodeResponse, error) {
 }
 
 func (c *Client) GetToken(deviceCode string) (*TokenResponse, error) {
-	url := fmt.Sprintf("%s/api/cli/auth/token?device_code=%s", c.BaseURL, deviceCode)
+	// Validate device code format (alphanumeric, 8 chars)
+	if len(deviceCode) != 8 {
+		return nil, fmt.Errorf("invalid device code format")
+	}
+	// URL encode the device code to prevent injection
+	encodedCode := url.QueryEscape(deviceCode)
+	url := fmt.Sprintf("%s/api/cli/auth/token?device_code=%s", c.BaseURL, encodedCode)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -259,8 +267,22 @@ type ServersResponse struct {
 	Servers []Server `json:"servers"`
 }
 
+// validateID validates that an ID contains only safe characters
+func validateID(id string) error {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, id)
+	if !matched || len(id) == 0 || len(id) > 100 {
+		return fmt.Errorf("invalid ID format")
+	}
+	return nil
+}
+
 func (c *Client) ListServers(accessToken string, projectID string) (*ServersResponse, error) {
-	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+projectID+"/servers", nil)
+	if err := validateID(projectID); err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+	// URL encode to prevent path injection
+	encodedProjectID := url.PathEscape(projectID)
+	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+encodedProjectID+"/servers", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +331,16 @@ type DatabasesResponse struct {
 }
 
 func (c *Client) ListDatabases(accessToken string, projectID string, serverID string) (*DatabasesResponse, error) {
-	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+projectID+"/servers/"+serverID+"/databases", nil)
+	if err := validateID(projectID); err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+	if err := validateID(serverID); err != nil {
+		return nil, fmt.Errorf("invalid server ID: %w", err)
+	}
+	// URL encode to prevent path injection
+	encodedProjectID := url.PathEscape(projectID)
+	encodedServerID := url.PathEscape(serverID)
+	req, err := http.NewRequest("GET", c.BaseURL+"/api/developer/projects/"+encodedProjectID+"/servers/"+encodedServerID+"/databases", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +389,16 @@ type QueryResponse struct {
 }
 
 func (c *Client) ExecuteQuery(accessToken string, projectID string, serverID string, query string, args []interface{}) (*QueryResponse, error) {
-	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/database/query", c.BaseURL, projectID, serverID)
+	if err := validateID(projectID); err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+	if err := validateID(serverID); err != nil {
+		return nil, fmt.Errorf("invalid server ID: %w", err)
+	}
+	// URL encode to prevent path injection
+	encodedProjectID := url.PathEscape(projectID)
+	encodedServerID := url.PathEscape(serverID)
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/database/query", c.BaseURL, encodedProjectID, encodedServerID)
 	
 	reqBody := QueryRequest{
 		Query: query,
@@ -489,7 +529,20 @@ type CreateNameserverResponse struct {
 }
 
 func (c *Client) CreateNameserver(accessToken string, projectID string, serverID string, nameserverName string) (*CreateNameserverResponse, error) {
-	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases", c.BaseURL, projectID, serverID)
+	if err := validateID(projectID); err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+	if err := validateID(serverID); err != nil {
+		return nil, fmt.Errorf("invalid server ID: %w", err)
+	}
+	// Validate nameserver name
+	if len(nameserverName) == 0 || len(nameserverName) > 100 {
+		return nil, fmt.Errorf("invalid nameserver name: must be 1-100 characters")
+	}
+	// URL encode to prevent path injection
+	encodedProjectID := url.PathEscape(projectID)
+	encodedServerID := url.PathEscape(serverID)
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases", c.BaseURL, encodedProjectID, encodedServerID)
 	
 	reqBody := CreateNameserverRequest{
 		DatabaseName: nameserverName,
@@ -554,12 +607,38 @@ type InitializeNameserverResponse struct {
 }
 
 func (c *Client) InitializeNameserver(accessToken string, projectID string, serverID string, nameserverID string) (*InitializeNameserverResponse, error) {
-	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases/%s/initialize", c.BaseURL, projectID, serverID, nameserverID)
+	return c.InitializeNameserverWithOptions(accessToken, projectID, serverID, nameserverID, "messaging", false)
+}
+
+func (c *Client) InitializeNameserverWithOptions(accessToken string, projectID string, serverID string, nameserverID string, schemaType string, dropExisting bool) (*InitializeNameserverResponse, error) {
+	if err := validateID(projectID); err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+	if err := validateID(serverID); err != nil {
+		return nil, fmt.Errorf("invalid server ID: %w", err)
+	}
+	if err := validateID(nameserverID); err != nil {
+		return nil, fmt.Errorf("invalid nameserver ID: %w", err)
+	}
+	// Validate schema type
+	validTypes := map[string]bool{
+		"messaging": true,
+		"analytics": true,
+		"both":      true,
+	}
+	if !validTypes[schemaType] {
+		return nil, fmt.Errorf("invalid schema type: must be 'messaging', 'analytics', or 'both'")
+	}
+	// URL encode to prevent path injection
+	encodedProjectID := url.PathEscape(projectID)
+	encodedServerID := url.PathEscape(serverID)
+	encodedNameserverID := url.PathEscape(nameserverID)
+	url := fmt.Sprintf("%s/api/developer/projects/%s/servers/%s/databases/%s/initialize", c.BaseURL, encodedProjectID, encodedServerID, encodedNameserverID)
 	
-	// Send request body with default schema type
+	// Send request body with specified options
 	reqBody := InitializeNameserverRequest{
-		SchemaType:   "messaging",
-		DropExisting: false,
+		SchemaType:   schemaType,
+		DropExisting: dropExisting,
 	}
 	
 	jsonData, err := json.Marshal(reqBody)
